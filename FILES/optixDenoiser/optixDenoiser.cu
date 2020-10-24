@@ -36,11 +36,6 @@
 #include "prd.h"
 #include "color.cuh"
 
-#ifndef M_PI
-#define M_PI 3.141592653589793
-#endif // !M_PI
-
-
 #define LIGHT_RAY_TYPE 2
 #define CONNECTIVE_RAY_TYPE 3
 
@@ -128,40 +123,66 @@ RT_PROGRAM void pathtrace_camera()
 		prd.lambda = rnd(prd.seed) * 400 + 380; // random wavelenght
 		//prd.lambda = 390;
 		prd.attenuation = getRGB(prd.lambda);
+		prd.scatter = true;
+		prd.light = false;
 
         // Initialze per-ray data (for light ray)
         PerRayData_radiance lightRay_prd;
         lightRay_prd.result = make_float3(0.f);
         lightRay_prd.attenuation = make_float3(1.f);
+		lightRay_prd.radiance = make_float3(15.f); // same as emitt
         lightRay_prd.countEmitted = true;
         lightRay_prd.done = false;
         lightRay_prd.seed = seed;
         lightRay_prd.depth = 0;
-        lightRay_prd.lambda = rnd(lightRay_prd.seed) * 400 + 380; // random wavelenght
+		lightRay_prd.lambda = prd.lambda; // follow prd
+		lightRay_prd.scatter = true;
+		lightRay_prd.light = true;
         //prd.lambda = 390;
-        lightRay_prd.attenuation = getRGB(lightRay_prd.lambda);
+		lightRay_prd.attenuation = prd.attenuation;
+
+		//init light ray data
+		ParallelogramLight light = lights[0]; // todo random will be preferable (only one light for current scene)
+		const float z1 = rnd(lightRay_prd.seed);
+		const float z2 = rnd(lightRay_prd.seed);
+		const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
+		lightRay_prd.origin = light_pos;
+		lightRay_prd.normal = -light.normal;
+
+		//uniform sample on sphere
+		float theta = 2.0f * 3.141592653589793 * rnd(lightRay_prd.seed);
+		float phi = acos(1.0f - 2.0f * rnd(lightRay_prd.seed));
+		float3 direction = make_float3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
+		lightRay_prd.direction = direction;
+
+		light_cache[0] = lightRay_prd;
+
+		int light_depth = 20;
+
+		//lightRay_prd.origin = light_pos;
+		//lightRay_prd.direction = direction;
 
         // Each iteration is a segment of the ray path.  The closest hit will
         // return new segments to be traced here.
         for(;;)
         {
-            Ray ray = make_Ray(ray_origin, ray_direction, RADIANCE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
-            rtTrace(top_object, ray, prd);
+			//if (lightRay_prd.depth > 2)
+			//{
+			Ray ray = make_Ray(ray_origin, ray_direction, RADIANCE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
+			rtTrace(top_object, ray, prd);
+			//}
+			
+			
+			if (lightRay_prd.depth <= light_depth) // cast light ray
+			{
+				Ray lightRay = make_Ray(lightRay_prd.origin, lightRay_prd.direction, LIGHT_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
+				//Ray lightRay = make_Ray(light_pos, direction, LIGHT_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
+				rtTrace(top_object, lightRay, lightRay_prd);
 
+				light_cache[lightRay_prd.depth+1] = lightRay_prd;
+			}
 
-            //cast light ray
-            ParallelogramLight light = lights[0];
-            const float z1 = rnd(lightRay_prd.seed);
-            const float z2 = rnd(lightRay_prd.seed);
-            const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
-
-            //uniform sample on sphere
-            float theta = 2.0f * M_PI * rnd(lightRay_prd.seed);
-            float phi = acos(1.0f - 2.0f * rnd(lightRay_prd.seed));
-            float3 direction = make_float3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
-            
-            Ray lightRay = make_Ray(light_pos, direction, LIGHT_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
-            rtTrace(top_object, lightRay, lightRay_prd);
+			// connect path
 
             if(prd.done)
             {
@@ -180,11 +201,46 @@ RT_PROGRAM void pathtrace_camera()
             }
 
             prd.depth++;
+			lightRay_prd.depth++;
             prd.result += prd.radiance * prd.attenuation;
 
             // Update ray data for the next path segment
             ray_origin = prd.origin;
             ray_direction = prd.direction;
+
+			for (int i = 0; i <= lightRay_prd.depth; i++)
+			{
+				if (prd.scatter && light_cache[i].scatter)
+				{
+					//PerRayData_radiance connectRay_prd;
+					PerRayData_pathtrace_shadow connectRay_prd;
+					//connectRay_prd.done = false;
+					connectRay_prd.inShadow = false;
+					float3 connect_direction = normalize(prd.origin - light_cache[i].origin);
+					float C = length(prd.origin - light_cache[i].origin);
+					if (dot(light_cache[i].normal, connect_direction) > 0.0f && dot(prd.normal, -connect_direction) > 0.0f)
+					{
+						Ray connectRay = make_Ray(light_cache[i].origin, connect_direction, SHADOW_RAY_TYPE, scene_epsilon, C - scene_epsilon);
+						//Ray connectRay = make_Ray(light_cache[i].origin, connect_direction, CONNECTIVE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
+						rtTrace(top_object, connectRay, connectRay_prd);
+						//if (C >= length(light_cache[i].origin - connectRay_prd.origin))
+						if (connectRay_prd.inShadow)
+						{
+							//
+						}
+						else
+						{
+							prd.radiance += light_cache[i].radiance * dot(light_cache[i].normal, connect_direction) * dot(prd.normal, -connect_direction); //todo need add weight
+							//prd.radiance += light_cache[i].radiance;
+							//prd.radiance = make_float3(15.f);
+							//prd.attenuation *= light_cache[i].attenuation;
+							prd.attenuation = color(prd.attenuation, light_cache[i].attenuation);
+							//prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
+						}
+					}
+				}
+			}
+
         }
 
         result += prd.result;
@@ -244,6 +300,8 @@ RT_PROGRAM void diffuseEmitter()
     //current_prd.done = true;
 	float3 hitpoint = ray.origin + t_hit * ray.direction;
 	current_prd.origin = hitpoint;
+	current_prd.t = t_hit;
+	current_prd.scatter = true;
 
     // TODO: Find out what the albedo buffer should really have. For now just set to white for 
     // light sources.
@@ -306,7 +364,8 @@ RT_PROGRAM void diffuse()
         current_prd.albedo = modulated_diffuse_color;
         current_prd.normal = ffnormal;
     }
-
+	current_prd.scatter = true;
+	current_prd.t = t_hit;
     //
     // Generate a reflection ray.  This will be traced back in ray-gen.
     //
@@ -360,7 +419,9 @@ RT_PROGRAM void diffuse()
                 const float A = length(cross(light.v1, light.v2));
                 // convert area based pdf to solid angle
                 const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-                result += light.emission * weight;
+                
+				if (!current_prd.light) result += light.emission * weight;
+				//else result = current_prd.radiance * weight;
             }
         }
     }
@@ -394,7 +455,7 @@ RT_PROGRAM void shadow()
 
 RT_PROGRAM void exception()
 {
-    rtPrintf("HI");
+    rtPrintf("");
     //output_buffer[launch_index] = make_float4(bad_color, 1.0f);
     
 }
@@ -410,8 +471,17 @@ rtDeclareVariable(float3, bg_color, , );
 
 RT_PROGRAM void miss()
 {
-    current_prd.radiance = bg_color;
+    //current_prd.radiance = bg_color;
     current_prd.done = true;
+	float theta = 2.0f * 3.141592653589793 * rnd(current_prd.seed);
+	float phi = acos(1.0f - 2.0f * rnd(current_prd.seed));
+	current_prd.direction = make_float3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi)); // assign new direction
+	current_prd.scatter = false;
+	current_prd.t = 2;
+	if (!current_prd.light)
+	{
+		current_prd.radiance = bg_color;
+	}
 
     // TODO: Find out what the albedo buffer should really have. For now just set to black for misses.
     if (current_prd.depth == 0)
@@ -419,7 +489,7 @@ RT_PROGRAM void miss()
       current_prd.albedo = make_float3(0, 0, 0);
       current_prd.normal = make_float3(0, 0, 0);
     }
-    
+	//current_prd.depth--;
 }
 
 

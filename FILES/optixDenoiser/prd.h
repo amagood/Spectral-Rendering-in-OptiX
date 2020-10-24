@@ -44,6 +44,10 @@ struct PerRayData_radiance
 	int countEmitted;
 	int done;
 	int lambda;
+	float t;
+	bool scatter;
+	bool light;
+	bool inShadow;
 };
 
 

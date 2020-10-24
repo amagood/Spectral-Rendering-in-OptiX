@@ -119,12 +119,14 @@ RT_PROGRAM void closest_hit_radiance()
 		normal = -normal; // test if normal is outward
 	}
 	float cos_theta_i = optix::dot(w_out, normal);
-	prd_radiance.depth--;
+	//prd_radiance.depth--;
 	if (prd_radiance.depth == 0)
 	{
 		prd_radiance.albedo = make_float3(1.0f);
 		prd_radiance.normal = normal;
 	}
+	prd_radiance.scatter = false;
+	prd_radiance.t = t_hit;
 
 	float refraction_index = cauchyRefractionIndex(prd_radiance.lambda/1000.0f, B, C );
 
@@ -163,7 +165,7 @@ RT_PROGRAM void closest_hit_radiance()
         prd_radiance.origin = hitpoint;
         prd_radiance.direction = w_in; 
 		//prd_radiance.attenuation = prd_radiance.attenuation * reflection_color;
-		prd_radiance.radiance *= reflection_color *transmittance;
+		//prd_radiance.radiance *= reflection_color *transmittance;
     } else {
         // Refract
         const float3 w_in = w_t;
@@ -173,7 +175,7 @@ RT_PROGRAM void closest_hit_radiance()
         prd_radiance.origin = hitpoint;
         prd_radiance.direction = w_in; 
 		//prd_radiance.attenuation = prd_radiance.attenuation * refraction_color;
-		prd_radiance.radiance *= refraction_color *transmittance;
+		//prd_radiance.radiance *= refraction_color *transmittance;
     }
 
     // Note: we do not trace the ray for the next bounce here, we just set it up for

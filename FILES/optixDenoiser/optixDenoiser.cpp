@@ -794,9 +794,9 @@ void loadGeometry()
 {
     // Light buffer
     ParallelogramLight light;
-    light.corner = make_float3(-0.5f, 7.99f, -0.5f);
-    light.v1 = make_float3(1.0f, 0.0f, 0.0f);
-    light.v2 = make_float3(0.0f, 0.0f, 1.0f);
+    light.corner = make_float3(-0.1f, 7.99f, -0.1f);
+    light.v1 = make_float3(0.2f, 0.0f, 0.0f);
+    light.v2 = make_float3(0.0f, 0.0f, 0.2f);
     light.normal = -normalize(cross(light.v1, light.v2));
     light.emission = make_float3(15.0f, 15.0f, 15.0f);
 
@@ -850,8 +850,9 @@ void loadGeometry()
 	mesh_light.ignore_mats = false;
 	//mesh_light.any_hit = diffuse_em;
 	mesh_light.closest_hit = diffuse_em;
+	mesh_light.any_hit = diffuse_ah;
 	mesh_light.context = context;
-	loadMesh("cornell_box_light.obj", mesh_light);
+	loadMesh("cornell_box_small_light.obj", mesh_light);
 	mesh_light.geom_instance["emission_color"]->setFloat(light.emission);
 	geometry_group->addChild(mesh_light.geom_instance);
 
@@ -859,7 +860,7 @@ void loadGeometry()
     OptiXMesh mesh;
     mesh.use_tri_api = true;
     mesh.ignore_mats = false;
-    //mesh.any_hit = diffuse_ah;
+    mesh.any_hit = diffuse_ah;
     mesh.closest_hit = glass_ch;
     mesh.context = context;
 	//mesh.intersection = context->createProgramFromPTXFile(ptx_tri, "mesh_intersect_refine");
@@ -870,8 +871,8 @@ void loadGeometry()
 	mesh.geom_instance["fresnel_minimum"]->setFloat(0.1f);
 	mesh.geom_instance["fresnel_maximum"]->setFloat(1.0f);
 	//mesh.geom_instance["refraction_index"]->setFloat(1.6f); // cut
-	mesh.geom_instance["B"]->setFloat(1.4580f);
-	mesh.geom_instance["C"]->setFloat(0.154f);
+	mesh.geom_instance["B"]->setFloat(1.617f);
+	mesh.geom_instance["C"]->setFloat(0.0323f);
 	mesh.geom_instance["refraction_color"]->setFloat(white);
 	mesh.geom_instance["reflection_color"]->setFloat(white);
     mesh.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
@@ -888,18 +889,18 @@ void loadGeometry()
 	loadMesh("cornell_box_floor.obj", mesh_gound);
 	mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
     geometry_group->addChild(mesh_gound.geom_instance);
-	//loadMesh("cornell_box_wall_right.obj", mesh_gound);
-	//mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
-	//geometry_group->addChild(mesh_gound.geom_instance);
-	//loadMesh("cornell_box_wall_left.obj", mesh_gound);
-	//mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
-	//geometry_group->addChild(mesh_gound.geom_instance);
-	//loadMesh("cornell_box_wall_back.obj", mesh_gound);
-	//mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
-	//geometry_group->addChild(mesh_gound.geom_instance);
-	//loadMesh("cornell_box_roof.obj", mesh_gound);
-	//mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
-	//geometry_group->addChild(mesh_gound.geom_instance);
+	loadMesh("cornell_box_wall_right.obj", mesh_gound);
+	mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
+	geometry_group->addChild(mesh_gound.geom_instance);
+	loadMesh("cornell_box_wall_left.obj", mesh_gound);
+	mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
+	geometry_group->addChild(mesh_gound.geom_instance);
+	loadMesh("cornell_box_wall_back.obj", mesh_gound);
+	mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
+	geometry_group->addChild(mesh_gound.geom_instance);
+	loadMesh("cornell_box_roof.obj", mesh_gound);
+	mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
+	geometry_group->addChild(mesh_gound.geom_instance);
 
     geometry_group->setAcceleration(context->createAcceleration("noAccel"));
 
