@@ -99,6 +99,8 @@ RT_PROGRAM void pathtrace_camera()
     float3 albedo = make_float3(0.0f);
     float3 normal = make_float3(0.0f);
 
+	int sample;
+
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
     do 
     {
@@ -164,6 +166,7 @@ RT_PROGRAM void pathtrace_camera()
 
         // Each iteration is a segment of the ray path.  The closest hit will
         // return new segments to be traced here.
+		sample = 0;
         for(;;)
         {
 			//if (lightRay_prd.depth > 2)
@@ -175,14 +178,12 @@ RT_PROGRAM void pathtrace_camera()
 			
 			if (lightRay_prd.depth <= light_depth) // cast light ray
 			{
-				Ray lightRay = make_Ray(lightRay_prd.origin, lightRay_prd.direction, LIGHT_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
+				Ray lightRay = make_Ray(lightRay_prd.origin, lightRay_prd.direction, RADIANCE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
 				//Ray lightRay = make_Ray(light_pos, direction, LIGHT_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
 				rtTrace(top_object, lightRay, lightRay_prd);
 
 				light_cache[lightRay_prd.depth+1] = lightRay_prd;
 			}
-
-			// connect path
 
             if(prd.done)
             {
@@ -191,24 +192,8 @@ RT_PROGRAM void pathtrace_camera()
                 break;
             }
 
-            // Russian roulette termination 
-            if(prd.depth >= rr_begin_depth)
-            {
-                float pcont = fmaxf(prd.attenuation);
-                if(rnd(prd.seed) >= pcont)
-                    break;
-                prd.attenuation /= pcont;
-            }
-
-            prd.depth++;
-			lightRay_prd.depth++;
-            prd.result += prd.radiance * prd.attenuation;
-
-            // Update ray data for the next path segment
-            ray_origin = prd.origin;
-            ray_direction = prd.direction;
-
-			for (int i = 0; i <= lightRay_prd.depth; i++)
+			// connect path
+			for (int i = 0; i <= lightRay_prd.depth + 1; i++)
 			{
 				if (prd.scatter && light_cache[i].scatter)
 				{
@@ -230,16 +215,36 @@ RT_PROGRAM void pathtrace_camera()
 						}
 						else
 						{
-							prd.radiance += light_cache[i].radiance * dot(light_cache[i].normal, connect_direction) * dot(prd.normal, -connect_direction); //todo need add weight
-							//prd.radiance += light_cache[i].radiance;
+							//prd.radiance += light_cache[i].radiance * dot(light_cache[i].normal, connect_direction) * dot(prd.normal, -connect_direction); //todo need add weight
+							//prd.radiance += make_float3(0.1f);
 							//prd.radiance = make_float3(15.f);
+							prd.result += ((prd.radiance + light_cache[i].radiance) * dot(light_cache[i].normal, connect_direction) * dot(prd.normal, -connect_direction)) * color(light_cache[i].attenuation, prd.attenuation);
 							//prd.attenuation *= light_cache[i].attenuation;
-							prd.attenuation = color(prd.attenuation, light_cache[i].attenuation);
+							//prd.attenuation = new_color(light_cache[i].attenuation, prd.attenuation);
 							//prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
+							sample++;
 						}
 					}
 				}
 			}
+
+            // Russian roulette termination 
+            if(prd.depth >= rr_begin_depth)
+            {
+                float pcont = fmaxf(prd.attenuation);
+                if(rnd(prd.seed) >= pcont)
+                    break;
+                prd.attenuation /= pcont;
+            }
+
+            prd.depth++;
+			if (lightRay_prd.depth <= light_depth) lightRay_prd.depth++;
+            prd.result += prd.radiance * prd.attenuation;
+			//prd.radiance = make_float3(0.0f);
+
+            // Update ray data for the next path segment
+            ray_origin = prd.origin;
+            ray_direction = prd.direction;
 
         }
 
@@ -254,7 +259,7 @@ RT_PROGRAM void pathtrace_camera()
     //
     // Update the output buffer
     //
-    unsigned int spp = sqrt_num_samples*sqrt_num_samples;
+    unsigned int spp = sqrt_num_samples*sqrt_num_samples + sample;
     float3 pixel_color = result/(spp);
     float3 pixel_albedo = albedo/(spp);
     float3 pixel_normal = normal/(spp);
@@ -302,6 +307,7 @@ RT_PROGRAM void diffuseEmitter()
 	current_prd.origin = hitpoint;
 	current_prd.t = t_hit;
 	current_prd.scatter = true;
+	//current_prd.attenuation = make_float3(1.0f,0.f,0.f);
 
     // TODO: Find out what the albedo buffer should really have. For now just set to white for 
     // light sources.
@@ -383,6 +389,7 @@ RT_PROGRAM void diffuse()
     // with cosine density.
     //current_prd.attenuation = current_prd.attenuation * modulated_diffuse_color;
 	current_prd.attenuation = color(current_prd.attenuation, modulated_diffuse_color);
+	//current_prd.attenuation = new_color(current_prd.attenuation, modulated_diffuse_color);
     current_prd.countEmitted = false;
 
     //
@@ -420,8 +427,9 @@ RT_PROGRAM void diffuse()
                 // convert area based pdf to solid angle
                 const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
                 
+				//result += light.emission * weight;
 				if (!current_prd.light) result += light.emission * weight;
-				//else result = current_prd.radiance * weight;
+				else result = current_prd.radiance * weight;
             }
         }
     }
@@ -487,7 +495,7 @@ RT_PROGRAM void miss()
     if (current_prd.depth == 0)
     {
       current_prd.albedo = make_float3(0, 0, 0);
-      current_prd.normal = make_float3(0, 0, 0);
+      //current_prd.normal = make_float3(0, 0, 0);
     }
 	//current_prd.depth--;
 }

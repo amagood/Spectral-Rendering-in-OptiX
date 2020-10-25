@@ -165,7 +165,7 @@ RT_PROGRAM void closest_hit_radiance()
         prd_radiance.origin = hitpoint;
         prd_radiance.direction = w_in; 
 		//prd_radiance.attenuation = prd_radiance.attenuation * reflection_color;
-		//prd_radiance.radiance *= reflection_color *transmittance;
+		prd_radiance.radiance *= reflection_color *transmittance;
     } else {
         // Refract
         const float3 w_in = w_t;
@@ -175,7 +175,7 @@ RT_PROGRAM void closest_hit_radiance()
         prd_radiance.origin = hitpoint;
         prd_radiance.direction = w_in; 
 		//prd_radiance.attenuation = prd_radiance.attenuation * refraction_color;
-		//prd_radiance.radiance *= refraction_color *transmittance;
+		prd_radiance.radiance *= refraction_color *transmittance;
     }
 
     // Note: we do not trace the ray for the next bounce here, we just set it up for

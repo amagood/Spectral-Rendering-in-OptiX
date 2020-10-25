@@ -14,6 +14,16 @@ __host__ __device__ float3 color(float3 light, float3 local)
 	return make_float3((light.x > local.x) ? local.x : light.x, (light.y > local.y) ? local.y : light.y, (light.z > local.z) ? local.z : light.z);
 }
 
+__host__ __device__ float3 new_color(float3 light, float3 local)
+{
+	float scale;
+	if (light.x / local.x < light.y / local.y) scale = light.x / local.x;
+	else scale = light.y / local.y;
+	if (scale > light.z / local.z) scale = light.z / local.z;
+	return light*scale;
+}
+
+
 
 __device__ __host__ void RGB2XYZ(float R, float G, float B, float *X, float *Y, float *Z)
 {
