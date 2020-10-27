@@ -789,6 +789,8 @@ void lambdaInitiallBuffer()
     
 }
 
+Transform m_transform;
+Group m_group;
 
 void loadGeometry()
 {
@@ -856,7 +858,7 @@ void loadGeometry()
 	mesh_light.geom_instance["emission_color"]->setFloat(light.emission);
 	geometry_group->addChild(mesh_light.geom_instance);
 
-    
+    GeometryGroup geometry_group_diamond = context->createGeometryGroup();
     OptiXMesh mesh;
     mesh.use_tri_api = true;
     mesh.ignore_mats = false;
@@ -877,7 +879,8 @@ void loadGeometry()
 	mesh.geom_instance["reflection_color"]->setFloat(white);
     mesh.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
     //aabb.set(mesh.bbox_min, mesh.bbox_max);
-    geometry_group->addChild(mesh.geom_instance);
+    geometry_group_diamond->addChild(mesh.geom_instance);
+    geometry_group_diamond->setAcceleration(context->createAcceleration("Trbvh"));
     
 
 	OptiXMesh mesh_gound;
@@ -902,14 +905,29 @@ void loadGeometry()
 	//mesh_gound.geom_instance["diffuse_color"]->setFloat(white);
 	//geometry_group->addChild(mesh_gound.geom_instance);
 
-    geometry_group->setAcceleration(context->createAcceleration("noAccel"));
+    geometry_group->setAcceleration(context->createAcceleration("Trbvh"));
 
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //create transformation for diamond
 
-    // Create geometry group
-    //GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
-    //geometry_group->setAcceleration(context->createAcceleration("Trbvh"));
-    context["top_object"]->set(geometry_group);
+    //in global
+    m_transform = context->createTransform();
+    m_transform->setChild(geometry_group_diamond);
+    const float alpha = 0.385398163f;
+    // Rotation around (world) x-axis 
+    float m[16] = { cosf(alpha),sinf(alpha),0,0,
+                    -sinf(alpha),cosf(alpha),0,0,
+                    0,0,1,0,
+                    0,0,0,1 };
+    m_transform->setMatrix(false, m, NULL);
+    m_transform->validate();
+
+    //in global
+    m_group = context->createGroup();
+    m_group->addChild(m_transform);
+    m_group->addChild(geometry_group);
+    m_group->setAcceleration(context->createAcceleration("Trbvh"));
+
+    context["top_object"]->set(m_group);
 
     lambdaInitiallBuffer();
 
@@ -1374,6 +1392,26 @@ void glutKeyboardPress( unsigned char k, int x, int y )
                 else
                     loadTrainingFile(training_file_2);
             }
+        }
+        case('x'):
+        {
+            //spin
+            static float t = 0.0f;
+            t += 0.1;
+            float* M = new float[17];
+            //(*m_transform_ptr)->getMatrix(false, M, nullptr);
+            float m[17] = { cosf(t),sinf(t),0,0,
+                  -sinf(t),cosf(t),0,0,
+                  0,0,1,0,
+                  0,0,0,1 };
+            //m_transform->getMatrix(false, m, NULL);
+
+            m_transform->setMatrix(false, m, nullptr);
+            m_transform->validate();
+            m_group->getAcceleration()->markDirty();
+
+            frame_number = 1;
+            context["frame_number"]->setUint(frame_number);
         }
     }
 }
