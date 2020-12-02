@@ -867,7 +867,7 @@ void loadGeometry()
     mesh.context = context;
 	//mesh.intersection = context->createProgramFromPTXFile(ptx_tri, "mesh_intersect_refine");
 	//mesh.bounds = context->createProgramFromPTXFile(ptx_tri, "mesh_bounds");
-    loadMesh("diamond.obj", mesh);
+    loadMesh("prism_h_low.obj", mesh);
 	//mesh.geom_instance["diffuse_color"]->setFloat(blueScreenColor);
 	mesh.geom_instance["fresnel_exponent"]->setFloat(4.0f);
 	mesh.geom_instance["fresnel_minimum"]->setFloat(0.1f);

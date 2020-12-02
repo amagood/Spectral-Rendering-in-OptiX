@@ -116,13 +116,16 @@ RT_PROGRAM void pathtrace_camera()
 
         // Initialze per-ray data
 		PerRayData_radiance prd;
+		prd.radiance = make_float3(0.f); // same as emitt
         prd.result = make_float3(0.f);
         prd.attenuation = make_float3(1.f);
         prd.countEmitted = true;
         prd.done = false;
         prd.seed = seed;
         prd.depth = 0;
-		prd.lambda = rnd(prd.seed) * 400 + 380; // random wavelenght
+		//prd.lambda = int(rnd(prd.seed) * 400) + 380; // random wavelenght
+		prd.lambda = frame_number%400 + 380; // random wavelenght
+		//prd.lambda = frame_number%10*40 + int(rnd(prd.seed) * 40) + 380;
 		//prd.lambda = 390;
 		prd.attenuation = getRGB(prd.lambda);
 		prd.scatter = true;
@@ -150,6 +153,7 @@ RT_PROGRAM void pathtrace_camera()
 		const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
 		lightRay_prd.origin = light_pos;
 		lightRay_prd.normal = -light.normal;
+		const float A = length(cross(light.v1, light.v2));
 
 		//uniform sample on sphere
 		float theta = 2.0f * 3.141592653589793 * rnd(lightRay_prd.seed);
@@ -203,22 +207,19 @@ RT_PROGRAM void pathtrace_camera()
 					connectRay_prd.inShadow = false;
 					float3 connect_direction = normalize(prd.origin - light_cache[i].origin);
 					float C = length(prd.origin - light_cache[i].origin);
-					if (dot(light_cache[i].normal, connect_direction) > 0.0f && dot(prd.normal, -connect_direction) > 0.0f)
+					if ((dot(light_cache[i].normal, connect_direction) > 0.0f && dot(prd.normal, -connect_direction) > 0.0f) || C < 0.05)
 					{
 						Ray connectRay = make_Ray(light_cache[i].origin, connect_direction, SHADOW_RAY_TYPE, scene_epsilon, C - scene_epsilon);
 						//Ray connectRay = make_Ray(light_cache[i].origin, connect_direction, CONNECTIVE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
 						rtTrace(top_object, connectRay, connectRay_prd);
 						//if (C >= length(light_cache[i].origin - connectRay_prd.origin))
-						if (connectRay_prd.inShadow)
+						if (!connectRay_prd.inShadow || C < 0.05)
 						{
-							//
-						}
-						else
-						{
+							//if (C < 0.05) rtPrintf("shit");
 							//prd.radiance += light_cache[i].radiance * dot(light_cache[i].normal, connect_direction) * dot(prd.normal, -connect_direction); //todo need add weight
 							//prd.radiance += make_float3(0.1f);
 							//prd.radiance = make_float3(15.f);
-							prd.result += ((prd.radiance + light_cache[i].radiance) * dot(light_cache[i].normal, connect_direction) * dot(prd.normal, -connect_direction)) * color(light_cache[i].attenuation, prd.attenuation);
+							prd.result += ((prd.radiance + light_cache[i].radiance) * dot(light_cache[i].normal, connect_direction) * dot(prd.normal, -connect_direction)) * color(light_cache[i].attenuation, prd.attenuation) / (M_PIf * C * C);
 							//prd.attenuation *= light_cache[i].attenuation;
 							//prd.attenuation = new_color(light_cache[i].attenuation, prd.attenuation);
 							//prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
