@@ -39,6 +39,7 @@
 #define LIGHT_RAY_TYPE 2
 #define CONNECTIVE_RAY_TYPE 3
 
+
 using namespace optix;
 
 struct PerRayData_pathtrace_shadow
@@ -94,7 +95,8 @@ RT_PROGRAM void pathtrace_camera()
     float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
 
     float2 jitter_scale = inv_screen / sqrt_num_samples;
-    unsigned int samples_per_pixel = sqrt_num_samples*sqrt_num_samples;
+    float num_samples = sqrt_num_samples * sqrt_num_samples;
+    unsigned int samples_per_pixel = num_samples;
     float3 result = make_float3(0.0f);
     float3 albedo = make_float3(0.0f);
     float3 normal = make_float3(0.0f);
@@ -156,7 +158,7 @@ RT_PROGRAM void pathtrace_camera()
 		const float A = length(cross(light.v1, light.v2));
 
 		//uniform sample on sphere
-		float theta = 2.0f * 3.141592653589793 * rnd(lightRay_prd.seed);
+		float theta = 2.0f * M_PIf * rnd(lightRay_prd.seed);
 		float phi = acos(1.0f - 2.0f * rnd(lightRay_prd.seed));
 		float3 direction = make_float3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
 		lightRay_prd.direction = direction;
@@ -251,16 +253,16 @@ RT_PROGRAM void pathtrace_camera()
 
         result += prd.result;
         albedo += prd.albedo;
-        float3 normal_eyespace = (length(prd.normal) > 0.f) ? normalize(normal_matrix * prd.normal) : make_float3(0.,0.,1.);
+        float3 normal_eyespace = (length(prd.normal) > 0.f) ? normalize(normal_matrix * prd.normal) : make_float3(0.f, 0.f, 1.f);
         normal += normal_eyespace;
         seed = prd.seed;
         
-    } while (--samples_per_pixel);
+    }while (--samples_per_pixel);
     
     //
     // Update the output buffer
     //
-    unsigned int spp = sqrt_num_samples*sqrt_num_samples + sample;
+    unsigned int spp = num_samples + sample;
     float3 pixel_color = result/(spp);
     float3 pixel_albedo = albedo/(spp);
     float3 pixel_normal = normal/(spp);
@@ -482,7 +484,7 @@ RT_PROGRAM void miss()
 {
     //current_prd.radiance = bg_color;
     current_prd.done = true;
-	float theta = 2.0f * 3.141592653589793 * rnd(current_prd.seed);
+	float theta = 2.0f * M_PIf * rnd(current_prd.seed);
 	float phi = acos(1.0f - 2.0f * rnd(current_prd.seed));
 	current_prd.direction = make_float3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi)); // assign new direction
 	current_prd.scatter = false;
@@ -495,7 +497,7 @@ RT_PROGRAM void miss()
     // TODO: Find out what the albedo buffer should really have. For now just set to black for misses.
     if (current_prd.depth == 0)
     {
-      current_prd.albedo = make_float3(0, 0, 0);
+      current_prd.albedo = make_float3(0.f, 0.f, 0.f);
       //current_prd.normal = make_float3(0, 0, 0);
     }
 	//current_prd.depth--;
