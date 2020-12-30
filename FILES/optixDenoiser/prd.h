@@ -1,40 +1,10 @@
-/* 
- * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 #pragma once
-
 #include <optixu/optixu_vector_types.h>
 
-struct PerRayData_radiance
+// Eye Pass Per Ray Data
+struct eye_prd
 {
 	optix::float3 result;
-	optix::float3 albedo;
-	optix::float3 normal;
 	optix::float3 radiance;
 	optix::float3 attenuation;
 	optix::float3 origin;
@@ -43,11 +13,68 @@ struct PerRayData_radiance
 	int depth;
 	int countEmitted;
 	int done;
-	int lambda;
-	float t;
-	bool scatter;
-	bool light;
-	bool inShadow;
+	int scatter;
+	optix::float3 normal;
 };
 
+// Light Pass Per Ray Data
+struct light_prd
+{
+	optix::float3 origin;
+	optix::float3 direction;
+	optix::float3 color;
+	optix::float3 normal;
+	optix::float3 direction_outward;
+	unsigned int seed;
+	int depth;
+	int caustic;
+	int done;
+	int scatter; // check if surface can scatter
+	float intensity;
+};
 
+// information for storing photon
+struct Photon
+{
+	optix::float3 position;
+	optix::float3 direction; // incoming direction
+	optix::float3 color;
+	optix::float3 normal;
+	optix::float3 direction_outward;
+	int depth;
+	int scatter; // check if surface can scatter
+	int caustic;
+	float energy;
+};
+
+// Edge Edited - START
+struct LightcutNode {
+	Photon lightcut;
+	optix::float3 intensity;
+	int representativeId;
+	int leftTreeId;
+	int rightTreeId;
+	optix::float3 minBoundBox;
+	optix::float3 maxBoundBox;
+	int isLeaf;
+};
+
+struct CutVertex {
+	// point to specific LightcutNode
+	int lightIndex;
+	optix::float3 error;
+	optix::float3 illumination;
+	optix::float3 factor;
+};
+
+struct PhotonElement {
+	int photonIndex;
+	float m_distance;
+};
+
+struct KDTreeNode {
+	int photonIndex;
+	int isLeaf;
+	int leftTreeIndex, rightTreeIndex;
+};
+// Edge Edited - END

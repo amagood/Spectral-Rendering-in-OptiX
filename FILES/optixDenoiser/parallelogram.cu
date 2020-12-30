@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+/*
 #include <optix_world.h>
 
 using namespace optix;
@@ -85,4 +85,4 @@ RT_PROGRAM void bounds (int, float result[6])
     aabb->invalidate();
   }
 }
-
+*/
