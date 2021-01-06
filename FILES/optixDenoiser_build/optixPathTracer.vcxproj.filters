@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\optixPathTracer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\optixPathTracer\LightCut.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\optixPathTracer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\random.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\optixPathTracer\prd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\optixPathTracer\KDTree.h" />
+    <ClInclude Include="..\..\optixPathTracer\LightCut.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\parallelogram.cu">
+      <Filter>CUDA Files</Filter>
+    </None>
+    <None Include="..\..\optixPathTracer\LightPass.cu">
+      <Filter>CUDA Files</Filter>
+    </None>
+    <None Include="..\..\optixPathTracer\EyePass.cu">
+      <Filter>CUDA Files</Filter>
+    </None>
+    <None Include="..\..\optixPathTracer\color.cuh" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CUDA Files">
+      <UniqueIdentifier>{79359252-55F4-31D3-9D7E-1041A1E4F8E5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{A2893D81-45C6-3A04-8A2F-99EB7521FDD4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{FAE65068-6B57-30C9-B2BD-4E26DAC921E6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

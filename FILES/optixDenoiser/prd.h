@@ -14,6 +14,7 @@ struct eye_prd
 	int countEmitted;
 	int done;
 	int scatter;
+	int wavelength;
 	optix::float3 normal;
 };
 
@@ -30,6 +31,7 @@ struct light_prd
 	int caustic;
 	int done;
 	int scatter; // check if surface can scatter
+	int wavelength;
 	float intensity;
 };
 
@@ -44,6 +46,7 @@ struct Photon
 	int depth;
 	int scatter; // check if surface can scatter
 	int caustic;
+	int wavelength;
 	float energy;
 };
 
