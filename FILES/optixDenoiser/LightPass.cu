@@ -31,6 +31,7 @@
 #include "optixPathTracer.h"
 #include "random.h"
 #include "prd.h"
+#include "color.cuh"
 
 using namespace optix;
 
@@ -51,7 +52,13 @@ rtDeclareVariable(unsigned int,  light_depth, , ); // light max depth
 
 rtBuffer<Photon, 1>              photon_buffer;
 rtBuffer<ParallelogramLight>     lights;
+rtBuffer<float3, 1>				 lambda_buffer;
 
+__device__ __host__ float3 getRGB(int lambda)
+{
+	float3 tmp = lambda_buffer[lambda];
+	return XYZ2RGB(tmp);
+}
 
 RT_PROGRAM void LightPass()
 {
@@ -89,9 +96,13 @@ RT_PROGRAM void LightPass()
 	prd.depth = 0;
 	prd.normal = -light.normal;
 
+	prd.wavelength = int(rnd(prd.seed) * 400) + 380; // random wavelenght
+	prd.color *= getRGB(prd.wavelength);
+
 	Photon photon;
 	//photon.direction = -light.normal; // might change
 	photon.color = prd.color;
+	photon.wavelength = prd.wavelength;
 
 	// trace light
 	for (; prd.depth < light_depth;) // light with max depth of light_depth
@@ -151,7 +162,8 @@ RT_PROGRAM void diffuse()
 
 	current_prd.origin = hitpoint;
 	current_prd.normal = ffnormal;
-	current_prd.color = current_prd.color * diffuse_color;
+	//current_prd.color = current_prd.color * diffuse_color;
+	current_prd.color = color(current_prd.color, diffuse_color);
 
 	float z1 = rnd(current_prd.seed);
 	float z2 = rnd(current_prd.seed);
@@ -168,14 +180,14 @@ RT_PROGRAM void diffuse()
 }
 
 // glass material
-rtDeclareVariable(float, refraction_index, , );
+//rtDeclareVariable(float, refraction_index, , );
 rtDeclareVariable(float3, refraction_color, , );
 rtDeclareVariable(float3, reflection_color, , );
 
 rtDeclareVariable(float3, extinction, , );
 
-//rtDeclareVariable(float, B, , );
-//rtDeclareVariable(float, C, , );
+rtDeclareVariable(float, B, , );
+rtDeclareVariable(float, C, , );
 
 // -----------------------------------------------------------------------------
 
@@ -239,7 +251,7 @@ RT_PROGRAM void glass()
 	float3 hitpoint = ray.origin + t_hit * ray.direction;
 	float cos_theta_i = optix::dot(w_out, normal);
 
-	//float refraction_index = cauchyRefractionIndex(prd_radiance.lambda / 1000.0f, B, C);
+	float refraction_index = cauchyRefractionIndex(current_prd.wavelength / 1000.0f, B, C);
 
 	float eta;
 	float3 transmittance = make_float3(1.0f);

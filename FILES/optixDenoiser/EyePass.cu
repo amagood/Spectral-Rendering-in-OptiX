@@ -31,6 +31,7 @@
 #include "optixPathTracer.h"
 #include "random.h"
 #include "prd.h"
+#include "color.cuh"
 
  // Edge Edited - START
 #include <optixu/optixu_matrix_namespace.h>
@@ -69,13 +70,15 @@ rtDeclareVariable(unsigned int,  rr_begin_depth, , );
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<Photon, 1>				 photon_buffer;
 rtBuffer<ParallelogramLight>     lights;
-
-// Edge Edited - START
-rtBuffer<LightcutNode, 1>           lightcut_buffer;
-rtBuffer<KDTreeNode, 1>           kdtree_buffer;
-// Edge Edited - END
+rtBuffer<float3, 1>				 lambda_buffer;
 
 rtDeclareVariable(uint, photon_count, , );
+
+__device__ __host__ float3 getRGB(int lambda)
+{
+	float3 tmp = lambda_buffer[lambda];
+	return XYZ2RGB(tmp);
+}
 
 RT_PROGRAM void bidirectionalpathtrace_camera()
 {
@@ -107,12 +110,13 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 		eye_prd prd;
 		prd.result = make_float3(0.f);
 		prd.radiance = make_float3(0.f);
-		prd.attenuation = make_float3(1.f);
 		prd.countEmitted = true;
 		prd.done = false;
 		prd.seed = seed;
 		prd.depth = 0;
 		prd.scatter = false;
+		prd.wavelength = int(rnd(prd.seed) * 400) + 380; // random wavelenght
+		prd.attenuation = getRGB(prd.wavelength);
 
 		// Each iteration is a segment of the ray path.  The closest hit will
 		// return new segments to be traced here.
@@ -132,7 +136,7 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 			{
 				for (int i = 0; i < photon_count; i++)
 				{
-					if (photon_buffer[i].scatter == true)
+					if (photon_buffer[i].scatter == true && photon_buffer[i].wavelength == prd.wavelength)
 					{
 						float3 connect_direction = photon_buffer[i].position - prd.origin;
 						float C = length(connect_direction);
@@ -350,7 +354,8 @@ RT_PROGRAM void diffuse()
 
 	// NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
 	// with cosine density.
-	current_prd.attenuation = current_prd.attenuation * diffuse_color;
+	//current_prd.attenuation = current_prd.attenuation * diffuse_color;
+	current_prd.attenuation = color(current_prd.attenuation, diffuse_color);
 	current_prd.countEmitted = false;
 
 	//
@@ -513,7 +518,7 @@ RT_PROGRAM void metal()
 //rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 //rtDeclareVariable(float, t_hit, rtIntersectionDistance, );
 
-rtDeclareVariable(float,        refraction_index, , );
+//rtDeclareVariable(float,        refraction_index, , );
 rtDeclareVariable(float3, refraction_color, , );
 rtDeclareVariable(float3, reflection_color, , );
 
@@ -521,8 +526,8 @@ rtDeclareVariable(float3, extinction, , );
 
 rtDeclareVariable(eye_prd, prd_radiance, rtPayload, );
 
-//rtDeclareVariable(float, B, , );
-//rtDeclareVariable(float, C, , );
+rtDeclareVariable(float, B, , );
+rtDeclareVariable(float, C, , );
 
 // -----------------------------------------------------------------------------
 
@@ -586,7 +591,7 @@ RT_PROGRAM void glass()
 	float3 hitpoint = ray.origin + t_hit * ray.direction;
 	float cos_theta_i = optix::dot(w_out, normal);
 
-	//float refraction_index = cauchyRefractionIndex(prd_radiance.lambda / 1000.0f, B, C);
+	float refraction_index = cauchyRefractionIndex(prd_radiance.wavelength / 1000.0f, B, C);
 
 		float eta;
 		float3 transmittance = make_float3(1.0f);
