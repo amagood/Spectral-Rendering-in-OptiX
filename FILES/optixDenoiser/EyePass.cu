@@ -136,7 +136,8 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 			{
 				for (int i = 0; i < photon_count; i++)
 				{
-					if (photon_buffer[i].scatter == true && photon_buffer[i].wavelength == prd.wavelength)
+					if (photon_buffer[i].energy < 1e-6) continue;
+					if (photon_buffer[i].scatter == true && (!photon_buffer[i].split || photon_buffer[i].wavelength == prd.wavelength))
 					{
 						float3 connect_direction = photon_buffer[i].position - prd.origin;
 						float C = length(connect_direction);
@@ -365,7 +366,7 @@ RT_PROGRAM void diffuse()
 	float3 result = make_float3(0.0f);
 
 	//rtPrintf("%d",num_lights);
-	/**/
+	/*
 	for (int i = 0; i < num_lights; ++i)
 	{
 		// Choose random point on light
@@ -401,9 +402,9 @@ RT_PROGRAM void diffuse()
 				result += light.emission * weight;
 			}
 		}
-	}
+	}*/
 
-	current_prd.radiance = result;
+	//current_prd.radiance = result;
 
 }
 

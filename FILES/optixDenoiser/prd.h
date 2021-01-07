@@ -32,6 +32,7 @@ struct light_prd
 	int done;
 	int scatter; // check if surface can scatter
 	int wavelength;
+	int split; // if the light have split its wavelength
 	float intensity;
 };
 
@@ -47,6 +48,7 @@ struct Photon
 	int scatter; // check if surface can scatter
 	int caustic;
 	int wavelength;
+	int split;
 	float energy;
 };
 

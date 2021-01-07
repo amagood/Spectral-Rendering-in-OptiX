@@ -83,8 +83,8 @@ bool           use_pbo = true;
 int            frame_number = 1;
 int            sqrt_num_samples = 2;
 int            rr_begin_depth = 2;
-int			   light_depth = 8;
-int			   inital_photon_count = 4000;
+int			   light_depth = 10;
+int			   inital_photon_count = 50;
 int			   photon_count = inital_photon_count;
 int			   photon_thread = photon_count / light_depth;
 Program        pgram_intersection = 0;
@@ -875,8 +875,8 @@ void loadGeometry(int diffuse_id)
 					mesh_glass.geom_instance["fresnel_minimum"]->setFloat(0.1f);
 					mesh_glass.geom_instance["fresnel_maximum"]->setFloat(1.0f);
 					//mesh_glass.geom_instance["refraction_index"]->setFloat(tmp_float); 
-					mesh_glass.geom_instance["B"]->setFloat(tmp_float);
-					mesh_glass.geom_instance["C"]->setFloat(tmp_C);
+					mesh_glass.geom_instance["B"]->setFloat(tmp_float); // Base IOR
+					mesh_glass.geom_instance["C"]->setFloat(tmp_C); // 
 					mesh_glass.geom_instance["refraction_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
 					mesh_glass.geom_instance["reflection_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
 					mesh_glass.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
@@ -1068,6 +1068,7 @@ void glutRun()
 
 void glutDisplay()
 {
+	context->launch(1, photon_thread);
 	updateCamera();
 	context->launch(0, width, height);
 
@@ -1111,26 +1112,6 @@ void glutKeyboardPress(unsigned char k, int x, int y)
 		frame_number = 1;
 		context["frame_number"]->setUint(frame_number);
 		photon_count = inital_photon_count;
-		context->launch(1, photon_thread);
-
-		Photon* photonArray = (Photon*)photon_buffer->map();
-		int last_valid = 0;
-		int reset_count = 0;
-		bool gap = false;
-		Photon photon;
-		for (int i = 0; i < photon_count; ++i) 
-		{
-			//printf("%f %f %f\n", photonArray[i].color.x, photonArray[i].color.y, photonArray[i].color.z);
-			if (photonArray[i].energy >= 1e-6 && length(photonArray[i].color) > 0)
-			{
-				photonArray[last_valid] = photonArray[i];
-				last_valid++;
-				reset_count++;
-			}
-		}
-		photon_buffer->unmap();
-		photon_count = reset_count;
-		context["photon_count"]->setUint(photon_count);
 		break;
 	}
 	}
@@ -1294,6 +1275,7 @@ int main(int argc, char** argv)
 		}
 		else
 		{
+			//context->launch(1, photon_thread);
 			updateCamera();
 			context->launch(0, width, height);
 			sutil::displayBufferPPM(out_file.c_str(), getOutputBuffer(), false);

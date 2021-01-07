@@ -69,8 +69,6 @@ RT_PROGRAM void LightPass()
 	float z1 = rnd(seed);
 	float z2 = rnd(seed);
 	const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
-	//float3 emission = make_float3(1.0f) / photon_buffer.size();
-	//float3 emission = normalize(light.emission) / photon_buffer.size();
 	float3 emission = light.emission;
 
 	// set up light direciton
@@ -86,8 +84,6 @@ RT_PROGRAM void LightPass()
 	prd.origin = light_pos;
 	prd.direction = p;
 	prd.color = emission;
-	//prd.intensity = length(light.emission);
-	//prd.intensity = photon_buffer.size() * length(light.emission);
 	prd.intensity = 1.0f;
 	prd.seed = seed;
 	prd.scatter = true;
@@ -95,9 +91,10 @@ RT_PROGRAM void LightPass()
 	prd.done = false;
 	prd.depth = 0;
 	prd.normal = -light.normal;
+	prd.split = false;
 
 	prd.wavelength = int(rnd(prd.seed) * 400) + 380; // random wavelenght
-	prd.color *= getRGB(prd.wavelength);
+	//prd.color *= getRGB(prd.wavelength);
 
 	Photon photon;
 	//photon.direction = -light.normal; // might change
@@ -116,11 +113,12 @@ RT_PROGRAM void LightPass()
 		photon.scatter = prd.scatter;
 		photon.caustic = prd.caustic;
 		photon.direction_outward = prd.direction;
+		photon.split = prd.split;
 		// save photon to buffer
 		photon_buffer[launch_index.x * light_depth + prd.depth] = photon;
 
 		photon.direction = prd.direction;
-		prd.intensity *= 0.5;
+		//prd.intensity *= 0.5;
 		
 		// cast ray
 		Ray ray = make_Ray(prd.origin, prd.direction, RADIANCE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
@@ -175,6 +173,7 @@ RT_PROGRAM void diffuse()
 
 	current_prd.done = false;
 	current_prd.scatter = true;
+	current_prd.intensity *= 0.5;
 
 	// update light intensity (energy) todo //
 }
@@ -282,6 +281,10 @@ RT_PROGRAM void glass()
 	current_prd.done = false;
 	current_prd.scatter = false;
 	current_prd.caustic = true;
+	current_prd.split = true;
+
+	current_prd.color *= getRGB(current_prd.wavelength);
+
 	if (z <= R) {
 		// Reflect
 		const float3 w_in = reflect(normalize(-w_out), normalize(normal));
