@@ -62,9 +62,6 @@
 #include <vector>
 #include "prd.h"
 
-#include <optixPathTracer\LightCut.h>
-#include <optixPathTracer\KDTree.h>
-
 using namespace optix;
 
 const char* const SAMPLE_NAME = "optixPathTracer";
@@ -80,11 +77,12 @@ uint32_t       width = 512;
 uint32_t       height = 512;
 bool           use_pbo = true;
 
+int			   output_mode = 1; // identify which mode is active (for changing botton text)
 int            frame_number = 1;
 int            sqrt_num_samples = 2;
 int            rr_begin_depth = 2;
-int			   light_depth = 10;
-int			   inital_photon_count = 50;
+int			   light_depth = 8;
+int			   inital_photon_count = 120;
 int			   photon_count = inital_photon_count;
 int			   photon_thread = photon_count / light_depth;
 Program        pgram_intersection = 0;
@@ -108,8 +106,6 @@ optix::Aabb    aabb;
 
 // Buffer
 Buffer photon_buffer;
-Buffer kdtree_buffer;
-Buffer lightcut_buffer;
 
 //------------------------------------------------------------------------------
 //
@@ -242,25 +238,6 @@ void createContext()
 	memset(photon_buffer->map(), 0, sizeof(Photon) * photon_count);
 	photon_buffer->unmap();
 	context["photon_count"]->setUint(photon_count);
-
-	// Edge Edited - START
-	lightcut_buffer = context->createBuffer(RT_BUFFER_INPUT_OUTPUT);
-	lightcut_buffer->setFormat(RT_FORMAT_USER);
-	lightcut_buffer->setElementSize(sizeof(LightcutNode));
-	lightcut_buffer->setSize(2 * photon_count);
-	context["lightcut_buffer"]->set(lightcut_buffer);
-	memset(lightcut_buffer->map(), 0, 2 * sizeof(LightcutNode) * photon_count);
-	lightcut_buffer->unmap();
-	context["lightcut_count"]->setUint(2 * photon_count);
-
-	kdtree_buffer = context->createBuffer(RT_BUFFER_INPUT_OUTPUT);
-	kdtree_buffer->setFormat(RT_FORMAT_USER);
-	kdtree_buffer->setElementSize(sizeof(KDTreeNode));
-	kdtree_buffer->setSize(photon_count);
-	context["kdtree_buffer"]->set(kdtree_buffer);
-	memset(kdtree_buffer->map(), 0, sizeof(KDTreeNode) * photon_count);
-	kdtree_buffer->unmap();
-	// Edge Edited - END
 
 	context["sqrt_num_samples"]->setUint(sqrt_num_samples);
 	context["bad_color"]->setFloat(1000000.0f, 0.0f, 1000000.0f); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
@@ -701,7 +678,6 @@ void lambdaInitiallBuffer()
 
 	memcpy(lambda_buffer->map(), lambdas, sizeof(float3) * 781);
 	lambda_buffer->unmap();
-
 }
 
 
@@ -728,6 +704,7 @@ void loadGeometry(int diffuse_id)
 	// set up material for eye pass
 	const char* eye_ptx = sutil::getPtxString(SAMPLE_NAME, "EyePass.cu");
 	Program diffuse_ch = context->createProgramFromPTXString(eye_ptx, "diffuse");
+	Program diffuse_direct_light_ch = context->createProgramFromPTXString(eye_ptx, "diffuse_direct_light"); // debug closest hit
 	Program diffuse_ah = context->createProgramFromPTXString(eye_ptx, "shadow");
 	Program diffuse_em = context->createProgramFromPTXString(eye_ptx, "diffuseEmitter");
 	Program glass_ch = context->createProgramFromPTXString(eye_ptx, "glass");
@@ -780,7 +757,8 @@ void loadGeometry(int diffuse_id)
 	mesh_diffuse.ignore_mats = ignore_mats;
 	mesh_diffuse.any_hit = diffuse_ah;
 
-	if (diffuse_id == 1) mesh_diffuse.closest_hit = diffuse_ch;
+	if (diffuse_id < 3) mesh_diffuse.closest_hit = diffuse_ch;
+	if (diffuse_id == 3) mesh_diffuse.closest_hit = diffuse_direct_light_ch;
 	
 	OptiXMesh mesh_metal;
 	mesh_metal.use_tri_api = true;
@@ -840,61 +818,44 @@ void loadGeometry(int diffuse_id)
 			else if (material == "metal")
 			{
 				Input >> tmp_x >> tmp_y >> tmp_z;
-				if (diffuse_id == 3)
-				{
-					loadMesh(obj_name, mesh_diffuse);
-					mesh_diffuse.geom_instance["diffuse_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
-					geometry_group->addChild(mesh_diffuse.geom_instance);
-				}
-				else
-				{
-					loadMesh(obj_name, mesh_metal);
-					mesh_metal.geom_instance["metal_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
-					geometry_group->addChild(mesh_metal.geom_instance);
-					
-					// set up light pass
-					loadMesh(obj_name, mesh_photon_metal);
-					light_geometry_group->addChild(mesh_photon_metal.geom_instance);
-				}
+				
+				loadMesh(obj_name, mesh_metal);
+				mesh_metal.geom_instance["metal_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
+				geometry_group->addChild(mesh_metal.geom_instance);
+				
+				// set up light pass
+				loadMesh(obj_name, mesh_photon_metal);
+				light_geometry_group->addChild(mesh_photon_metal.geom_instance);
+				
 			}
 			else if (material == "glass")
 			{
 				Input >> tmp_float;
 				Input >> tmp_C;
 				Input >> tmp_x >> tmp_y >> tmp_z;
-				if (diffuse_id == 3)
-				{
-					loadMesh(obj_name, mesh_diffuse);
-					mesh_diffuse.geom_instance["diffuse_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
-					geometry_group->addChild(mesh_diffuse.geom_instance);
-				}
-				else
-				{
-					loadMesh(obj_name, mesh_glass);
-					mesh_glass.geom_instance["fresnel_exponent"]->setFloat(4.0f);
-					mesh_glass.geom_instance["fresnel_minimum"]->setFloat(0.1f);
-					mesh_glass.geom_instance["fresnel_maximum"]->setFloat(1.0f);
-					//mesh_glass.geom_instance["refraction_index"]->setFloat(tmp_float); 
-					mesh_glass.geom_instance["B"]->setFloat(tmp_float); // Base IOR
-					mesh_glass.geom_instance["C"]->setFloat(tmp_C); // 
-					mesh_glass.geom_instance["refraction_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
-					mesh_glass.geom_instance["reflection_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
-					mesh_glass.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
-					geometry_group->addChild(mesh_glass.geom_instance);
-					
-					// set up light pass
-					loadMesh(obj_name, mesh_photon_glass);
-					mesh_photon_glass.geom_instance["fresnel_exponent"]->setFloat(4.0f);
-					mesh_photon_glass.geom_instance["fresnel_minimum"]->setFloat(0.1f);
-					mesh_photon_glass.geom_instance["fresnel_maximum"]->setFloat(1.0f);
-					mesh_photon_glass.geom_instance["refraction_index"]->setFloat(tmp_float);
-					mesh_photon_glass.geom_instance["refraction_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
-					mesh_photon_glass.geom_instance["reflection_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
-					mesh_photon_glass.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
-					light_geometry_group->addChild(mesh_photon_glass.geom_instance);
-					
-				}
 				
+				loadMesh(obj_name, mesh_glass);
+				mesh_glass.geom_instance["fresnel_exponent"]->setFloat(4.0f);
+				mesh_glass.geom_instance["fresnel_minimum"]->setFloat(0.1f);
+				mesh_glass.geom_instance["fresnel_maximum"]->setFloat(1.0f);
+				//mesh_glass.geom_instance["refraction_index"]->setFloat(tmp_float); 
+				mesh_glass.geom_instance["B"]->setFloat(tmp_float); // Base IOR
+				mesh_glass.geom_instance["C"]->setFloat(tmp_C); // 
+				mesh_glass.geom_instance["refraction_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
+				mesh_glass.geom_instance["reflection_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
+				mesh_glass.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
+				geometry_group->addChild(mesh_glass.geom_instance);
+				
+				// set up light pass
+				loadMesh(obj_name, mesh_photon_glass);
+				mesh_photon_glass.geom_instance["fresnel_exponent"]->setFloat(4.0f);
+				mesh_photon_glass.geom_instance["fresnel_minimum"]->setFloat(0.1f);
+				mesh_photon_glass.geom_instance["fresnel_maximum"]->setFloat(1.0f);
+				mesh_photon_glass.geom_instance["refraction_index"]->setFloat(tmp_float);
+				mesh_photon_glass.geom_instance["refraction_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
+				mesh_photon_glass.geom_instance["reflection_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
+				mesh_photon_glass.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
+				light_geometry_group->addChild(mesh_photon_glass.geom_instance);
 			}
 			geometry_group->setAcceleration(context->createAcceleration("Trbvh"));
 			light_geometry_group->setAcceleration(context->createAcceleration("Trbvh"));
@@ -1068,9 +1029,10 @@ void glutRun()
 
 void glutDisplay()
 {
-	context->launch(1, photon_thread);
+	photon_thread = photon_count / light_depth;
+	context->launch(1, photon_thread); // light pass
 	updateCamera();
-	context->launch(0, width, height);
+	context->launch(0, width, height); // eye pass
 
 	sutil::displayBufferGL(getOutputBuffer());
 
@@ -1079,7 +1041,11 @@ void glutDisplay()
 		sutil::displayFps(frame_count++);
 	}
 
-	sutil::displayText("Spectral Render", 140, 10);
+	// botton text
+	if      (output_mode == 1) sutil::displayText("Bidiretional Path Tracing", 140, 10);
+	else if (output_mode == 2) sutil::displayText("Path Tracing", 140, 10);
+	else if (output_mode == 3) sutil::displayText("Direct Light (Debug)", 140, 10);
+
 	char str[64];
 	sprintf(str, "#%d", frame_number);
 	sutil::displayText(str, (float)width - 50, (float)height - 20);
@@ -1106,12 +1072,34 @@ void glutKeyboardPress(unsigned char k, int x, int y)
 		sutil::displayBufferPPM(outputImage.c_str(), getOutputBuffer(), false);
 		break;
 	}
-	case('1'):
+	case('1'): // bidirectional path tracing
 	{
 		loadGeometry(1);
 		frame_number = 1;
 		context["frame_number"]->setUint(frame_number);
 		photon_count = inital_photon_count;
+		context["photon_count"]->setUint(photon_count);
+		output_mode = 1;
+		break;
+	}
+	case('2'): // path tracing
+	{
+		loadGeometry(2);
+		frame_number = 1;
+		context["frame_number"]->setUint(frame_number);
+		photon_count = 0;
+		context["photon_count"]->setUint(photon_count);
+		output_mode = 2;
+		break;
+	}
+	case('3'): // direct light
+	{
+		loadGeometry(3);
+		frame_number = 1;
+		context["frame_number"]->setUint(frame_number);
+		photon_count = 0;
+		context["photon_count"]->setUint(photon_count);
+		output_mode = 3;
 		break;
 	}
 	}

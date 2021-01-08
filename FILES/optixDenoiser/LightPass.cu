@@ -94,6 +94,7 @@ RT_PROGRAM void LightPass()
 	prd.split = false;
 
 	prd.wavelength = int(rnd(prd.seed) * 400) + 380; // random wavelenght
+	//prd.wavelength = frame_number % 400 + 380; // frame wavelenght
 	//prd.color *= getRGB(prd.wavelength);
 
 	Photon photon;
@@ -173,7 +174,7 @@ RT_PROGRAM void diffuse()
 
 	current_prd.done = false;
 	current_prd.scatter = true;
-	current_prd.intensity *= 0.5;
+	current_prd.intensity *= 0.8;
 
 	// update light intensity (energy) todo //
 }

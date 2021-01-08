@@ -4,7 +4,6 @@
     <ClCompile Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\optixPathTracer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\optixPathTracer\LightCut.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\optixPathTracer.h">
@@ -16,8 +15,6 @@
     <ClInclude Include="..\..\optixPathTracer\prd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\optixPathTracer\KDTree.h" />
-    <ClInclude Include="..\..\optixPathTracer\LightCut.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\CMakeLists.txt" />

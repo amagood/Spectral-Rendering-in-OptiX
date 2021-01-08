@@ -33,11 +33,6 @@
 #include "prd.h"
 #include "color.cuh"
 
- // Edge Edited - START
-#include <optixu/optixu_matrix_namespace.h>
-#define RT_MATRIX_ACCESS(m, N, i, j) m[i*N + j]
-// Edge Edited - END
-
 using namespace optix;
 
 struct PerRayData_pathtrace_shadow
@@ -116,6 +111,7 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 		prd.depth = 0;
 		prd.scatter = false;
 		prd.wavelength = int(rnd(prd.seed) * 400) + 380; // random wavelenght
+		//prd.wavelength = frame_number % 400 + 380; // frame wavelenght
 		prd.attenuation = getRGB(prd.wavelength);
 
 		// Each iteration is a segment of the ray path.  The closest hit will
@@ -136,7 +132,7 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 			{
 				for (int i = 0; i < photon_count; i++)
 				{
-					if (photon_buffer[i].energy < 1e-6) continue;
+					if (photon_buffer[i].energy < 1e-6) continue; // skip miss path
 					if (photon_buffer[i].scatter == true && (!photon_buffer[i].split || photon_buffer[i].wavelength == prd.wavelength))
 					{
 						float3 connect_direction = photon_buffer[i].position - prd.origin;
@@ -152,8 +148,8 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 							if (!connectRay_prd.inShadow) // if connect
 							{
 								// connecting light and eye subpath
-								prd.result += (prd.attenuation * photon_buffer[i].color) * (photon_buffer[i].energy) * eye_cos * light_cos;
-								//prd.result += make_float3(0.f,0.f,10.f);
+								prd.result += (prd.attenuation * photon_buffer[i].color) * (photon_buffer[i].energy) * eye_cos * light_cos; // still using more like normal path tracing way to calculate color...
+								//prd.result += color(prd.attenuation, photon_buffer[i].color) * (photon_buffer[i].energy) * eye_cos * light_cos; // connect ray's color might be wrong with the way of spectral.
 								connect_path++;
 							}
 						}
@@ -358,57 +354,9 @@ RT_PROGRAM void diffuse()
 	//current_prd.attenuation = current_prd.attenuation * diffuse_color;
 	current_prd.attenuation = color(current_prd.attenuation, diffuse_color);
 	current_prd.countEmitted = false;
-
-	//
-	// Next event estimation (compute direct lighting).
-	//
-	unsigned int num_lights = lights.size();
-	float3 result = make_float3(0.0f);
-
-	//rtPrintf("%d",num_lights);
-	/*
-	for (int i = 0; i < num_lights; ++i)
-	{
-		// Choose random point on light
-		ParallelogramLight light = lights[i];
-		const float z1 = rnd(current_prd.seed);
-		const float z2 = rnd(current_prd.seed);
-		const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
-		//const float3 light_pos = make_float3(0,10,0);
-
-		// Calculate properties of light sample (for area based pdf)
-		const float  Ldist = length(light_pos - hitpoint);
-		const float3 L = normalize(light_pos - hitpoint);
-		//const float3 L = normalize(make_float3(0,-1,0));
-		const float  nDl = dot(ffnormal, L);
-		float tmp = dot(normalize(light.normal), L);
-		const float  LnDl = tmp > 0 ? tmp : -tmp;
-		//light.emission = make_float3(15, 15, 15);
-
-		// cast shadow ray
-		if (nDl > 0.0f && LnDl > 0.0f)
-		{
-			PerRayData_pathtrace_shadow shadow_prd;
-			shadow_prd.inShadow = false;
-			// Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
-			Ray shadow_ray = make_Ray(hitpoint, L, SHADOW_RAY_TYPE, scene_epsilon, Ldist - scene_epsilon);
-			rtTrace(eye_object, shadow_ray, shadow_prd);
-
-			if (!shadow_prd.inShadow)
-			{
-				const float A = length(cross(light.v1, light.v2));
-				// convert area based pdf to solid angle
-				const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-				result += light.emission * weight;
-			}
-		}
-	}*/
-
-	//current_prd.radiance = result;
-
 }
 
-RT_PROGRAM void diffuse_phong_shadow()
+RT_PROGRAM void diffuse_direct_light()
 {
 	float3 world_shading_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, shading_normal));
 	float3 world_geometric_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, geometric_normal));

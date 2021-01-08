@@ -326,13 +326,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\optixPathTracer\LightCut.cpp" />
     <ClCompile Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\optixPathTracer.cpp" />
     <None Include="..\..\optixPathTracer\color.cuh" />
     <None Include="..\..\optixPathTracer\EyePass.cu" />
     <None Include="..\..\optixPathTracer\LightPass.cu" />
-    <ClInclude Include="..\..\optixPathTracer\KDTree.h" />
-    <ClInclude Include="..\..\optixPathTracer\LightCut.h" />
     <ClInclude Include="..\..\optixPathTracer\prd.h" />
     <ClInclude Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\optixPathTracer.h" />
     <None Include="D:\appdata\OptiX SDK 6.5.0\SDK\optixPathTracer\parallelogram.cu" />

@@ -51,35 +51,3 @@ struct Photon
 	int split;
 	float energy;
 };
-
-// Edge Edited - START
-struct LightcutNode {
-	Photon lightcut;
-	optix::float3 intensity;
-	int representativeId;
-	int leftTreeId;
-	int rightTreeId;
-	optix::float3 minBoundBox;
-	optix::float3 maxBoundBox;
-	int isLeaf;
-};
-
-struct CutVertex {
-	// point to specific LightcutNode
-	int lightIndex;
-	optix::float3 error;
-	optix::float3 illumination;
-	optix::float3 factor;
-};
-
-struct PhotonElement {
-	int photonIndex;
-	float m_distance;
-};
-
-struct KDTreeNode {
-	int photonIndex;
-	int isLeaf;
-	int leftTreeIndex, rightTreeIndex;
-};
-// Edge Edited - END
