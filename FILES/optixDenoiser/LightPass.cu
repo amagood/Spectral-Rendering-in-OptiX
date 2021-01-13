@@ -149,6 +149,7 @@ rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3, shading_normal, attribute shading_normal, );
 rtDeclareVariable(float, t_hit, rtIntersectionDistance, );
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
+rtDeclareVariable(float, Kd, , );
 rtDeclareVariable(float3, diffuse_color, , );
 
 RT_PROGRAM void diffuse()
@@ -174,7 +175,7 @@ RT_PROGRAM void diffuse()
 
 	current_prd.done = false;
 	current_prd.scatter = true;
-	current_prd.intensity *= 0.8;
+	current_prd.intensity *= Kd; // Kd
 
 	// update light intensity (energy) todo //
 }
@@ -282,9 +283,6 @@ RT_PROGRAM void glass()
 	current_prd.done = false;
 	current_prd.scatter = false;
 	current_prd.caustic = true;
-	current_prd.split = true;
-
-	current_prd.color *= getRGB(current_prd.wavelength);
 
 	if (z <= R) {
 		// Reflect
@@ -295,6 +293,12 @@ RT_PROGRAM void glass()
 	}
 	else {
 		// Refract
+		if (current_prd.split == false)
+		{
+			current_prd.color *= getRGB(current_prd.wavelength);
+			current_prd.split = true;
+		}
+
 		const float3 w_in = w_t;
 		current_prd.origin = hitpoint;
 		current_prd.direction = w_in;

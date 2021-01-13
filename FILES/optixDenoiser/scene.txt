@@ -1,0 +1,8 @@
+e 15.0 4.0 0.0 0.0 4.0 0.0 0.0 1.0 0.0
+l point -1.5 7.99 -1.5 6.0 6.0 6.0
+o bunny.obj diffuse 1.0 1.0 1.0 0.0 0.5 0.0 1.0 1.0 1.0 0.0 1.0 0.0 0.0
+o cornell_box_floor.obj diffuse 1.0 1.0 1.0 0.0 0.0 0.0 1.0 1.0 1.0 0.0 1.0 0.0 0.0
+o cornell_box_wall_right.obj diffuse 1.0 0.0 0.0 0.0 0.0 0.0 1.0 1.0 1.0 0.0 1.0 0.0 0.0
+o cornell_box_wall_left.obj diffuse 0.0 1.0 0.0 0.0 0.0 0.0 1.0 1.0 1.0 0.0 1.0 0.0 0.0
+o cornell_box_wall_back.obj diffuse 1.0 1.0 1.0 0.0 0.0 0.0 1.0 1.0 1.0 0.0 1.0 0.0 0.0
+o cornell_box_roof.obj diffuse 1.0 1.0 1.0 0.0 0.0 0.0 1.0 1.0 1.0 0.0 1.0 0.0 0.0

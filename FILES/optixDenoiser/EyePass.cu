@@ -82,7 +82,7 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 	float2 inv_screen = 1.0f / make_float2(screen) * 2.f;
 	float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
 
-	float2 jitter_scale = inv_screen / sqrt_num_samples;
+	float2 jitter_scale = inv_screen / sqrt_num_samples * 1.5;
 	unsigned int samples_per_pixel = sqrt_num_samples * sqrt_num_samples;
 	float3 result = make_float3(0.0f);
 
@@ -91,6 +91,7 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 	unsigned int seed = tea<16>(screen.x * launch_index.y + launch_index.x, frame_number);
 	do
 	{
+		connect_path = 0; // how many connect path
 		//
 		// Sample pixel using jittering
 		//
@@ -114,6 +115,35 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 		//prd.wavelength = frame_number % 400 + 380; // frame wavelenght
 		prd.attenuation = getRGB(prd.wavelength);
 
+		// check for eyesubpath = 0 or 1
+		for (int i = 0; i < photon_count; i++)
+		{
+			if (photon_buffer[i].energy < 1e-6) continue; // skip miss path
+			float3 photon_eye_dir = photon_buffer[i].position - ray_origin;
+			if (dot(normalize(photon_eye_dir), ray_direction) == 1.0f)
+			{
+				PerRayData_pathtrace_shadow caustic_prd;
+				caustic_prd.inShadow = false;
+				Ray causticRay = make_Ray(ray_origin, ray_direction, SHADOW_RAY_TYPE, scene_epsilon, length(photon_eye_dir) - scene_epsilon);
+				rtTrace(eye_object, causticRay, caustic_prd);
+				if (!caustic_prd.inShadow) // if connect
+				{
+					if (photon_buffer[i].scatter == true) // eye subpath = 1
+					{
+						prd.result += photon_buffer[i].color *prd.attenuation;
+						connect_path++;
+						//rtPrintf("1");
+					}
+					if(dot(normalize(photon_buffer[i].direction_outward),-ray_direction) == 1.0f) // eye subpath = 0
+					{
+						prd.result += photon_buffer[i].color;
+						connect_path++;
+						//rtPrintf("0");
+					}
+				}
+			}
+		}
+
 		// Each iteration is a segment of the ray path.  The closest hit will
 		// return new segments to be traced here.
 		for (;;)
@@ -133,6 +163,7 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 				for (int i = 0; i < photon_count; i++)
 				{
 					if (photon_buffer[i].energy < 1e-6) continue; // skip miss path
+					// check connection with two subpath
 					if (photon_buffer[i].scatter == true && (!photon_buffer[i].split || photon_buffer[i].wavelength == prd.wavelength))
 					{
 						float3 connect_direction = photon_buffer[i].position - prd.origin;
@@ -175,14 +206,16 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 			ray_direction = prd.direction;
 		}
 
-		result += prd.result;
+		//result += prd.result;
+		result += prd.result / (connect_path + 1);
 		seed = prd.seed;
 	} while (--samples_per_pixel);
 
 	//
 	// Update the output buffer
 	//
-	float3 pixel_color = result / (sqrt_num_samples * sqrt_num_samples + connect_path);
+	//float3 pixel_color = result / (sqrt_num_samples * sqrt_num_samples + connect_path);
+	float3 pixel_color = result / (sqrt_num_samples * sqrt_num_samples);
 
 	if (frame_number > 1)
 	{
@@ -317,6 +350,7 @@ RT_PROGRAM void diffuseEmitter()
 //
 //-----------------------------------------------------------------------------
 
+rtDeclareVariable(float, Kd, , );
 rtDeclareVariable(float3,     diffuse_color, , );
 rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
@@ -347,12 +381,11 @@ RT_PROGRAM void diffuse()
 	current_prd.done = false;
 	current_prd.scatter = true;
 	current_prd.normal = ffnormal;
-	//diffuse_color = make_float3(255, 255, 255);
 
 	// NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
 	// with cosine density.
 	//current_prd.attenuation = current_prd.attenuation * diffuse_color;
-	current_prd.attenuation = color(current_prd.attenuation, diffuse_color);
+	current_prd.attenuation = color(current_prd.attenuation * Kd, diffuse_color); // Kd
 	current_prd.countEmitted = false;
 }
 

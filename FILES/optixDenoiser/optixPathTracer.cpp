@@ -81,8 +81,8 @@ int			   output_mode = 1; // identify which mode is active (for changing botton 
 int            frame_number = 1;
 int            sqrt_num_samples = 2;
 int            rr_begin_depth = 2;
-int			   light_depth = 8;
-int			   inital_photon_count = 120;
+int			   light_depth = 10;
+int			   inital_photon_count = 50;
 int			   photon_count = inital_photon_count;
 int			   photon_thread = photon_count / light_depth;
 Program        pgram_intersection = 0;
@@ -776,11 +776,11 @@ void loadGeometry(int diffuse_id)
 		if (input_type[0] == 'e')
 		{
 			Input >> tmp_x >> tmp_y >> tmp_z;
-			camera_eye = make_float3(tmp_x, tmp_y, tmp_z);
+			if(diffuse_id == 0) camera_eye = make_float3(tmp_x, tmp_y, tmp_z);
 			Input >> tmp_x >> tmp_y >> tmp_z;
-			camera_lookat = make_float3(tmp_x, tmp_y, tmp_z);
+			if (diffuse_id == 0) camera_lookat = make_float3(tmp_x, tmp_y, tmp_z);
 			Input >> tmp_x >> tmp_y >> tmp_z;
-			camera_up = make_float3(tmp_x, tmp_y, tmp_z);
+			if (diffuse_id == 0) camera_up = make_float3(tmp_x, tmp_y, tmp_z);
 			Input.ignore();
 		}
 		else if (input_type[0] == 'l')
@@ -806,12 +806,15 @@ void loadGeometry(int diffuse_id)
 			if (material == "diffuse")
 			{
 				loadMesh(obj_name, mesh_diffuse);
+				Input >> tmp_float;
 				Input >> tmp_x >> tmp_y >> tmp_z;
+				mesh_diffuse.geom_instance["Kd"]->setFloat(tmp_float);
 				mesh_diffuse.geom_instance["diffuse_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
 				geometry_group->addChild(mesh_diffuse.geom_instance);
 
 				// set up light pass
 				loadMesh(obj_name, mesh_photon_diffuse);
+				mesh_photon_diffuse.geom_instance["Kd"]->setFloat(tmp_float);
 				mesh_photon_diffuse.geom_instance["diffuse_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
 				light_geometry_group->addChild(mesh_photon_diffuse.geom_instance);
 			}
@@ -1072,6 +1075,16 @@ void glutKeyboardPress(unsigned char k, int x, int y)
 		sutil::displayBufferPPM(outputImage.c_str(), getOutputBuffer(), false);
 		break;
 	}
+	case('0'): // reset camera
+	{
+		loadGeometry(0);
+		frame_number = 1;
+		context["frame_number"]->setUint(frame_number);
+		photon_count = inital_photon_count;
+		context["photon_count"]->setUint(photon_count);
+		output_mode = 1;
+		break;
+	}
 	case('1'): // bidirectional path tracing
 	{
 		loadGeometry(1);
@@ -1253,7 +1266,7 @@ int main(int argc, char** argv)
 
 		createContext();
 		setupCamera();
-		loadGeometry(1);
+		loadGeometry(0);
 
 		context->validate();
 
