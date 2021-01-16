@@ -873,7 +873,7 @@ void loadGeometry(int diffuse_id)
 			Input >> tmp_x >> tmp_y >> tmp_z;
 			m = m * m.scale(make_float3(tmp_x, tmp_y, tmp_z));
 			Input >> tmp_float >> tmp_x >> tmp_y >> tmp_z;
-			m = m * m.rotate(tmp_float, make_float3(tmp_x, tmp_y, tmp_z));
+			m = m * m.rotate(tmp_float * M_PIf / 180.0f, make_float3(tmp_x, tmp_y, tmp_z));
 
 			transform->setMatrix(false, m.getData(), NULL);
 			light_transform->setMatrix(false, m.getData(), NULL);
