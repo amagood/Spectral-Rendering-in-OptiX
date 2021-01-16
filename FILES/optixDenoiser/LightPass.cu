@@ -49,6 +49,7 @@ rtDeclareVariable(uint2,         launch_index, rtLaunchIndex, );
 rtDeclareVariable(float3,        bad_color, , );
 rtDeclareVariable(unsigned int,  frame_number, , );
 rtDeclareVariable(unsigned int,  light_depth, , ); // light max depth
+rtDeclareVariable(float,		 light_path_count, , );
 
 rtBuffer<Photon, 1>              photon_buffer;
 rtBuffer<ParallelogramLight>     lights;
@@ -92,9 +93,13 @@ RT_PROGRAM void LightPass()
 	prd.depth = 0;
 	prd.normal = -light.normal;
 	prd.split = false;
+	prd.p = 1.0f;
+
+	float total_p = prd.p;
 
 	prd.wavelength = int(rnd(prd.seed) * 400) + 380; // random wavelenght
 	//prd.wavelength = frame_number % 400 + 380; // frame wavelenght
+	//prd.wavelength = 380;
 	//prd.color *= getRGB(prd.wavelength);
 
 	Photon photon;
@@ -115,6 +120,7 @@ RT_PROGRAM void LightPass()
 		photon.caustic = prd.caustic;
 		photon.direction_outward = prd.direction;
 		photon.split = prd.split;
+		photon.p = prd.p / total_p;
 		// save photon to buffer
 		photon_buffer[launch_index.x * light_depth + prd.depth] = photon;
 
@@ -124,6 +130,8 @@ RT_PROGRAM void LightPass()
 		// cast ray
 		Ray ray = make_Ray(prd.origin, prd.direction, RADIANCE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
 		rtTrace(light_object, ray, prd);
+
+		total_p += prd.p;
 		
 		if (prd.done) // miss
 		{
@@ -162,8 +170,11 @@ RT_PROGRAM void diffuse()
 
 	current_prd.origin = hitpoint;
 	current_prd.normal = ffnormal;
-	//current_prd.color = current_prd.color * diffuse_color;
+	//current_prd.color = current_prd.color * diffuse_color * Kd;
 	current_prd.color = color(current_prd.color, diffuse_color);
+
+	float distance = length(hitpoint - ray.origin);
+	current_prd.p *= abs(dot(normalize(ffnormal), normalize(-ray.direction))) / (distance * distance);
 
 	float z1 = rnd(current_prd.seed);
 	float z2 = rnd(current_prd.seed);
@@ -295,7 +306,7 @@ RT_PROGRAM void glass()
 		// Refract
 		if (current_prd.split == false)
 		{
-			current_prd.color *= getRGB(current_prd.wavelength);
+			current_prd.color *= getRGB(current_prd.wavelength) * light_path_count;
 			current_prd.split = true;
 		}
 

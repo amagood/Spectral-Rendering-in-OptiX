@@ -82,7 +82,7 @@ int            frame_number = 1;
 int            sqrt_num_samples = 2;
 int            rr_begin_depth = 2;
 int			   light_depth = 10;
-int			   inital_photon_count = 50;
+int			   inital_photon_count = 100;
 int			   photon_count = inital_photon_count;
 int			   photon_thread = photon_count / light_depth;
 Program        pgram_intersection = 0;
@@ -221,7 +221,6 @@ void createContext()
 
 	//Setup for Eye pass
 	const char* eye_ptx = sutil::getPtxString(SAMPLE_NAME, "EyePass.cu");
-	//context->setRayGenerationProgram(0, context->createProgramFromPTXString(eye_ptx, "pathtrace_camera"));
 	context->setRayGenerationProgram(0, context->createProgramFromPTXString(eye_ptx, "bidirectionalpathtrace_camera"));
 	context->setExceptionProgram(0, context->createProgramFromPTXString(eye_ptx, "exception"));
 	context->setMissProgram(0, context->createProgramFromPTXString(eye_ptx, "miss"));
@@ -242,7 +241,7 @@ void createContext()
 	context["sqrt_num_samples"]->setUint(sqrt_num_samples);
 	context["bad_color"]->setFloat(1000000.0f, 0.0f, 1000000.0f); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
 	context["bg_color"]->setFloat(make_float3(0.0f));
-
+	context["light_path_count"]->setFloat(photon_thread);
 }
 
 void loadMesh(const std::string& filename)

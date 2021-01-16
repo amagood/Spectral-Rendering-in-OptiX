@@ -15,6 +15,8 @@ struct eye_prd
 	int done;
 	int scatter;
 	int wavelength;
+	int split; // if the light have split its wavelength
+	float p; // todo
 	optix::float3 normal;
 };
 
@@ -33,6 +35,7 @@ struct light_prd
 	int scatter; // check if surface can scatter
 	int wavelength;
 	int split; // if the light have split its wavelength
+	float p; // todo
 	float intensity;
 };
 
@@ -49,5 +52,6 @@ struct Photon
 	int caustic;
 	int wavelength;
 	int split;
+	float p; // todo
 	float energy;
 };
