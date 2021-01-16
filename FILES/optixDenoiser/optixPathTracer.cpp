@@ -206,7 +206,7 @@ void createContext()
 	context = Context::create();
 	context->setRayTypeCount(2);
 	context->setEntryPointCount(2);
-	context->setStackSize(18000);
+	context->setStackSize(180000);
 	context->setMaxTraceDepth(2);
 
 	context->setPrintEnabled(true);
@@ -885,6 +885,11 @@ void loadGeometry(int diffuse_id)
 
 			Input.ignore();
 		}
+        else if(input_type[0] == '#')
+        {
+            string s;
+            getline(Input, s);
+        }
 	}
 
 	//light

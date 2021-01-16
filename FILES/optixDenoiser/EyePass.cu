@@ -539,7 +539,7 @@ RT_PROGRAM void glass()
 			// split the light into single wavelength
 			if (current_prd.split == false)
 			{
-				current_prd.attenuation *= getRGB(current_prd.wavelength);
+				current_prd.attenuation *= getRGB(current_prd.wavelength) * light_path_count;
 				current_prd.split = true;
 			}
 			//rtPrintf("%f %f %f\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
