@@ -83,19 +83,24 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 	float2 inv_screen = 1.0f / make_float2(screen) * 2.f;
 	float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
 
-	float2 jitter_scale = inv_screen / sqrt_num_samples * 1.5;
+	float2 jitter_scale = inv_screen / sqrt_num_samples;
 	unsigned int samples_per_pixel = sqrt_num_samples * sqrt_num_samples;
 	float3 result = make_float3(0.0f);
 
-	int connect_path = 0; // how many connect path
+	unsigned int path_count = 0; // how many connect path
+	unsigned int specular_path = 0, caustic_path = 0, bidirectional_path = 0;
 
 	unsigned int seed = tea<16>(screen.x * launch_index.y + launch_index.x, frame_number);
+	//float total_p = 0.0f;
 	do
 	{
-		connect_path = 0; // how many connect path
+		path_count = 0; // how many connect path
+		float3 connect_result = make_float3(0.f);
 		//
 		// Sample pixel using jittering
 		//
+		float total_p = 0.0f;
+
 		unsigned int x = samples_per_pixel % sqrt_num_samples;
 		unsigned int y = samples_per_pixel / sqrt_num_samples;
 		float2 jitter = make_float2(x - rnd(seed), y - rnd(seed));
@@ -106,7 +111,7 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 		// Initialze per-ray data
 		eye_prd prd;
 		prd.result = make_float3(0.f);
-		prd.radiance = make_float3(0.f);
+		prd.radiance = make_float3(1.f);
 		prd.countEmitted = true;
 		prd.done = false;
 		prd.seed = seed;
@@ -117,17 +122,16 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 		//prd.wavelength = frame_number % 400 + 380; // frame wavelenght
 		//prd.wavelength = 380;
 		//prd.attenuation = getRGB(prd.wavelength); // ray started as a single wavelength
-		prd.attenuation = make_float3(1.f); // ray started as full wavelength
+		//prd.attenuation = make_float3(1.0f); // ray started as full wavelength
+		prd.attenuation = make_float3(0.300985f, 0.274355f, 0.216741f); // ray started as full wavelength
 		prd.p = 1.0f; 
-
-		float total_p = 0.0f;
 
 		// check for eyesubpath = 0 or 1
 		for (int i = 0; i < photon_count; i++)
 		{
 			if (photon_buffer[i].energy < 1e-6) continue; // skip miss path
 			float3 photon_eye_dir = photon_buffer[i].position - ray_origin;
-			if (dot(normalize(photon_eye_dir), ray_direction) == 1.0f)
+			if (dot(normalize(photon_eye_dir), normalize(ray_direction)) >= 0.9999999f)
 			{
 				PerRayData_pathtrace_shadow caustic_prd;
 				caustic_prd.inShadow = false;
@@ -137,13 +141,19 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 				{
 					if (photon_buffer[i].scatter == true) // eye subpath = 1
 					{
-						prd.result += photon_buffer[i].color *prd.attenuation;
-						connect_path++;
+						total_p += photon_buffer[i].p * prd.p;
+						prd.result += photon_buffer[i].color * (photon_buffer[i].energy) *prd.attenuation;// *make_float3(100.0f, 0.f, 0.f);
+						caustic_path = 1;
+						//prd.result += make_float3(100.0f, 0.f, 0.f);
+						//path_count ++;
 					}
-					if(dot(normalize(photon_buffer[i].direction_outward),-ray_direction) == 1.0f) // eye subpath = 0
+					//prd.result += photon_buffer[i].color * (photon_buffer[i].energy) * prd.attenuation * 10.f;// *make_float3(100.0f, 0.f, 0.f);
+					if(dot(normalize(photon_buffer[i].direction_outward), -normalize(ray_direction)) >= 0.9f) // eye subpath = 0
 					{
-						prd.result += photon_buffer[i].color;
-						connect_path++;
+						total_p += photon_buffer[i].p;
+						prd.result += photon_buffer[i].color * (photon_buffer[i].energy);
+						specular_path = 1;
+						//path_count++;
 					}
 				}
 			}
@@ -156,13 +166,13 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 			Ray ray = make_Ray(ray_origin, ray_direction, RADIANCE_RAY_TYPE, scene_epsilon, RT_DEFAULT_MAX);
 			rtTrace(eye_object, ray, prd);
 
-			total_p += prd.p;
 
 			if (prd.done)
 			{
 				// We have hit the background or a luminaire
-				prd.result += prd.radiance * prd.attenuation; // / (prd.p / total_p);
-				//rtPrintf("%f\n", prd.possibility);
+				total_p += prd.p;
+				prd.result += prd.radiance * prd.attenuation;// / (prd.p / total_p);
+				//path_count++;
 				break;
 			}
 
@@ -187,10 +197,12 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 							if (!connectRay_prd.inShadow) // if connect
 							{
 								// connecting light and eye subpath
-								prd.result += (prd.attenuation * photon_buffer[i].color) * (photon_buffer[i].energy) * eye_cos * light_cos; // still using more like normal path tracing way to calculate color...
+								total_p += photon_buffer[i].p * prd.p;
+								connect_result += (prd.attenuation * photon_buffer[i].color) * (photon_buffer[i].energy) * eye_cos * light_cos; // still using more like normal path tracing way to calculate color...
 								//prd.result += (prd.attenuation * photon_buffer[i].color) * (photon_buffer[i].energy) * eye_cos * light_cos * (!photon_buffer[i].split? prd.p * photon_buffer[i].p:1.0f);
 								//prd.result += color(prd.attenuation, photon_buffer[i].color) * (photon_buffer[i].energy) * eye_cos * light_cos; // connect ray's color might be wrong with the way of spectral.
-								connect_path++;
+								path_count++;
+								bidirectional_path = 1;
 							}
 						}
 					}
@@ -203,7 +215,11 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 			{
 				float pcont = fmaxf(prd.attenuation);
 				if (rnd(prd.seed) >= pcont)
+				{
+					//path_count++; // failed path
 					break;
+				}
+					
 				prd.attenuation /= pcont;
 			}
 
@@ -214,10 +230,11 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 			ray_direction = prd.direction;
 		}
 
-		//rtPrintf("%f\n", total_possibility);
-
-		//result += prd.result;
-		result += prd.result / (connect_path + 1);
+		//rtPrintf("%d\n", total_path_asdf);
+		connect_result /= (path_count == 0?1.f: path_count);
+		prd.result += connect_result;
+		result += prd.result/(1 + specular_path + caustic_path + bidirectional_path);
+		//result += prd.result / (path_count);
 		seed = prd.seed;
 	} while (--samples_per_pixel);
 
@@ -226,14 +243,18 @@ RT_PROGRAM void bidirectionalpathtrace_camera()
 	//
 	//float3 pixel_color = result / (sqrt_num_samples * sqrt_num_samples + connect_path);
 	float3 pixel_color = result / (sqrt_num_samples * sqrt_num_samples);
+	//float3 pixel_color = result / path_count;
 
 	//rtPrintf("%f %f %f\n", pixel_color.x, pixel_color.y, pixel_color.z);
 
 	if (frame_number > 1)
 	{
 		float a = 1.0f / (float)frame_number;
+		float b = (float)frame_number;
 		float3 old_color = make_float3(output_buffer[launch_index]);
-		output_buffer[launch_index] = make_float4(lerp(old_color, pixel_color, a), 1.0f);
+		//output_buffer[launch_index] = make_float4(lerp(old_color, pixel_color, a), 1.0f);
+		output_buffer[launch_index] = make_float4((old_color + pixel_color / (b - 1)) * ((b - 1) / b), 1.0f);// *total_p; // test
+		//output_buffer[launch_index] += make_float4(pixel_color,1.0f);// *total_p; // test
 	}
 	else
 	{
@@ -254,7 +275,7 @@ rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 RT_PROGRAM void diffuseEmitter()
 {
 	//current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
-	current_prd.radiance = emission_color;
+	current_prd.attenuation *= emission_color;
 	current_prd.done = true;
 	current_prd.scatter = true;
 	float3 hitpoint = ray.origin + t_hit * ray.direction;
@@ -278,8 +299,6 @@ rtDeclareVariable(float3,	  bg_color, , );
 
 RT_PROGRAM void diffuse()
 {
-	//rtPrintf("hi");
-
 	float3 world_shading_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, shading_normal));
 	float3 world_geometric_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, geometric_normal));
 	float3 ffnormal = faceforward(world_shading_normal, -ray.direction, world_geometric_normal);
@@ -303,12 +322,13 @@ RT_PROGRAM void diffuse()
 	current_prd.normal = ffnormal;
 
 	float distance = length(hitpoint - ray.origin);
-	current_prd.p *= abs(dot(normalize(ffnormal), normalize(-ray.direction))) / (distance * distance);
+	current_prd.p *= abs(dot(normalize(ffnormal), normalize(-ray.direction))) / (distance * distance) * M_1_PIf * 0.5f;
 
 	// NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
 	// with cosine density.
-	//current_prd.attenuation = current_prd.attenuation * diffuse_color * Kd;
+	//current_prd.attenuation *= diffuse_color * Kd;
 	current_prd.attenuation = color(current_prd.attenuation * Kd, diffuse_color); // Kd
+	//current_prd.attenuation = getRGB(current_prd.wavelength);
 	current_prd.countEmitted = false;
 }
 
@@ -415,14 +435,6 @@ RT_PROGRAM void metal()
 	current_prd.attenuation *= metal_color;
 }
 
-//rtDeclareVariable(float3, shading_normal, attribute shading_normal, );
-//rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, );
-//rtDeclareVariable(float3, front_hit_point, attribute front_hit_point, );
-//rtDeclareVariable(float3, back_hit_point, attribute back_hit_point, );
-
-//rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
-//rtDeclareVariable(float, t_hit, rtIntersectionDistance, );
-
 //rtDeclareVariable(float,        refraction_index, , );
 rtDeclareVariable(float3, refraction_color, , );
 rtDeclareVariable(float3, reflection_color, , );
@@ -486,7 +498,6 @@ static __device__ __inline__ float3 logf(float3 v)
 RT_PROGRAM void glass()
 {
 	const float3 w_out = -ray.direction;
-	current_prd.done = false;
 	//float3 world_shading_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, shading_normal));
 	//float3 world_geometric_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, geometric_normal));
 	//float3 normal = faceforward(world_shading_normal, -ray.direction, world_geometric_normal);
@@ -526,27 +537,30 @@ RT_PROGRAM void glass()
 		current_prd.done = false;
 		current_prd.scatter = false;
 		current_prd.origin = hitpoint;
+		current_prd.normal = normal;
 
 		if (z <= R) {
 			// Reflect
 			const float3 w_in = reflect(normalize(-w_out), normalize(normal));
 			current_prd.direction = w_in;
-			current_prd.attenuation = current_prd.attenuation * reflection_color;
-			//current_prd.radiance *= reflection_color * transmittance;
+			current_prd.attenuation *= reflection_color;
+			current_prd.radiance *= reflection_color * transmittance;
 		}
 		else {
 			// Refract
 			// split the light into single wavelength
 			if (current_prd.split == false)
 			{
-				current_prd.attenuation *= getRGB(current_prd.wavelength) * light_path_count;
+				current_prd.attenuation *= getRGB(current_prd.wavelength) * make_float3(1.0f/0.300985f, 1.0f / 0.274355f, 1.0f / 0.216741f);
 				current_prd.split = true;
+				current_prd.p /= 400;
 			}
+			//rtPrintf("%d\n",current_prd.wavelength);
 			//rtPrintf("%f %f %f\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
 			const float3 w_in = w_t;
 			current_prd.direction = w_in;
-			current_prd.attenuation = current_prd.attenuation * refraction_color;
-			//current_prd.radiance *= refraction_color * transmittance;
+			current_prd.attenuation *= refraction_color;
+			current_prd.radiance *= refraction_color * transmittance;
 		}
 }
 //-----------------------------------------------------------------------------
@@ -572,7 +586,7 @@ RT_PROGRAM void shadow()
 
 RT_PROGRAM void exception()
 {
-    //output_buffer[launch_index] = make_float4(bad_color, 1.0f);
+    output_buffer[launch_index] = make_float4(bad_color, 1.0f);
 }
 
 
@@ -584,7 +598,7 @@ RT_PROGRAM void exception()
 
 RT_PROGRAM void miss()
 {
-    current_prd.radiance = bg_color;
+    //current_prd.radiance = bg_color;
 	current_prd.attenuation = make_float3(0.0f);
     current_prd.done = true;
 }

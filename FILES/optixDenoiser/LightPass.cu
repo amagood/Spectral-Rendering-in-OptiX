@@ -94,6 +94,7 @@ RT_PROGRAM void LightPass()
 	prd.normal = -light.normal;
 	prd.split = false;
 	prd.p = 1.0f;
+	//prd.direction = prd.normal; // para
 
 	float total_p = prd.p;
 
@@ -135,17 +136,7 @@ RT_PROGRAM void LightPass()
 		
 		if (prd.done) // miss
 		{
-			if (prd.scatter == true)
-			{
-				z1 = rnd(prd.seed);
-				z2 = rnd(prd.seed);
-				cosine_sample_hemisphere(z1, z2, p);
-				optix::Onb onb(prd.normal);
-				onb.inverse_transform(p);
-				prd.direction = p;
-				//rtPrintf("recast\n");
-			}
-			else break;
+			break;
 		}
 
 		prd.depth++;
@@ -170,7 +161,7 @@ RT_PROGRAM void diffuse()
 
 	current_prd.origin = hitpoint;
 	current_prd.normal = ffnormal;
-	//current_prd.color = current_prd.color * diffuse_color * Kd;
+	//current_prd.color = current_prd.color * diffuse_color;
 	current_prd.color = color(current_prd.color, diffuse_color);
 
 	float distance = length(hitpoint - ray.origin);
@@ -255,7 +246,6 @@ static __device__ __inline__ float3 logf(float3 v)
 RT_PROGRAM void glass()
 {
 	const float3 w_out = -ray.direction;
-	current_prd.done = false;
 	//float3 world_shading_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, shading_normal));
 	//float3 world_geometric_normal = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, geometric_normal));
 	//float3 normal = faceforward(world_shading_normal, -ray.direction, world_geometric_normal);
@@ -294,11 +284,12 @@ RT_PROGRAM void glass()
 	current_prd.done = false;
 	current_prd.scatter = false;
 	current_prd.caustic = true;
+	current_prd.normal = normal;
+	current_prd.origin = hitpoint;
 
 	if (z <= R) {
 		// Reflect
 		const float3 w_in = reflect(normalize(-w_out), normalize(normal));
-		current_prd.origin = hitpoint;
 		current_prd.direction = w_in;
 		current_prd.color = current_prd.color * reflection_color;
 	}
@@ -306,12 +297,10 @@ RT_PROGRAM void glass()
 		// Refract
 		if (current_prd.split == false)
 		{
-			current_prd.color *= getRGB(current_prd.wavelength) * light_path_count;
+			current_prd.color *= getRGB(current_prd.wavelength);// *light_path_count;
 			current_prd.split = true;
 		}
-
 		const float3 w_in = w_t;
-		current_prd.origin = hitpoint;
 		current_prd.direction = w_in;
 		current_prd.color = current_prd.color * refraction_color;
 	}

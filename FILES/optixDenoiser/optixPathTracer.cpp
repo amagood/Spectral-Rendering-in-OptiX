@@ -206,7 +206,7 @@ void createContext()
 	context = Context::create();
 	context->setRayTypeCount(2);
 	context->setEntryPointCount(2);
-	context->setStackSize(180000);
+	context->setStackSize(18000);
 	context->setMaxTraceDepth(2);
 
 	context->setPrintEnabled(true);
@@ -853,7 +853,8 @@ void loadGeometry(int diffuse_id)
 				mesh_photon_glass.geom_instance["fresnel_exponent"]->setFloat(4.0f);
 				mesh_photon_glass.geom_instance["fresnel_minimum"]->setFloat(0.1f);
 				mesh_photon_glass.geom_instance["fresnel_maximum"]->setFloat(1.0f);
-				mesh_photon_glass.geom_instance["refraction_index"]->setFloat(tmp_float);
+				mesh_photon_glass.geom_instance["B"]->setFloat(tmp_float); // Base IOR
+				mesh_photon_glass.geom_instance["C"]->setFloat(tmp_C); // 
 				mesh_photon_glass.geom_instance["refraction_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
 				mesh_photon_glass.geom_instance["reflection_color"]->setFloat(make_float3(tmp_x, tmp_y, tmp_z));
 				mesh_photon_glass.geom_instance["extintion"]->setFloat(-(make_float3(log(0.905f), log(0.63f), log(0.3))));
@@ -885,11 +886,11 @@ void loadGeometry(int diffuse_id)
 
 			Input.ignore();
 		}
-        else if(input_type[0] == '#')
-        {
-            string s;
-            getline(Input, s);
-        }
+		else if (input_type[0] == '#')
+		{
+			string s;
+			getline(Input, s);
+		}
 	}
 
 	//light
