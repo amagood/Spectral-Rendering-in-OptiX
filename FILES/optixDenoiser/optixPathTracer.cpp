@@ -60,6 +60,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include "svpng.h"
 #include "prd.h"
 
 using namespace optix;
@@ -1061,6 +1062,18 @@ void glutDisplay()
 	glutSwapBuffers();
 }
 
+unsigned char colorConvertToPngDisplay(float data)
+{
+    const float gamma_inv = 1.0f / 2.2f;
+    float gamma_invData = std::pow(data, gamma_inv) * 255.0f;
+
+    if(gamma_invData < 0.f)
+        gamma_invData = 0.f;
+    if(gamma_invData > 255.0f)
+        gamma_invData = 255.f;
+
+    return gamma_invData;
+}
 
 void glutKeyboardPress(unsigned char k, int x, int y)
 {
@@ -1078,6 +1091,29 @@ void glutKeyboardPress(unsigned char k, int x, int y)
 		const std::string outputImage = std::string(SAMPLE_NAME) + ".ppm";
 		std::cerr << "Saving current frame to '" << outputImage << "'\n";
 		sutil::displayBufferPPM(outputImage.c_str(), getOutputBuffer(), false);
+
+        FILE *fp = fopen("output.png", "wb");
+        float4 *rgba = (float4 *) getOutputBuffer()->map();
+        std::vector<unsigned char> data;
+        printf("HI~\n");
+        for(int i = height-1; i > 0; i--)
+        {
+            for(int j = 0; j < width; j++)
+            {
+                const float gamma_inv = 1.0f / 2.2f;
+
+                data.push_back(colorConvertToPngDisplay(rgba[i * width + j].x));
+                data.push_back(colorConvertToPngDisplay(rgba[i * width + j].y));
+                data.push_back(colorConvertToPngDisplay(rgba[i * width + j].z));
+                //printf("%f %f %f\n", rgba[i * height + j].x, rgba[i * height + j].y, rgba[i * height + j].z);
+            }
+        }
+        //vprintf("HI~");
+        svpng(fp, width, height, data.data() , 0);
+
+        fclose(fp);
+        fp = nullptr;
+        getOutputBuffer()->unmap();
 		break;
 	}
 	case('0'): // reset camera
